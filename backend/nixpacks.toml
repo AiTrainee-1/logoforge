@@ -1,0 +1,8 @@
+# Railway (Nixpacks) build configuration.
+# fonts-dejavu-core gives Pillow a real bold sans-serif for the character
+# label; without it Pillow falls back to its bundled default face.
+[phases.setup]
+aptPkgs = ["fonts-dejavu-core"]
+
+[start]
+cmd = "gunicorn 'app:create_app()' --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 300 --access-logfile - --error-logfile -"

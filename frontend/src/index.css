@@ -1,0 +1,153 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* --------------------------------------------------------------------------
+   Design tokens. Light is the default; .dark on <html> flips them.
+   -------------------------------------------------------------------------- */
+:root {
+  --background: oklch(0.985 0.002 260);
+  --foreground: oklch(0.21 0.02 265);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 265);
+  --primary: oklch(0.54 0.21 277);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.005 265);
+  --secondary-foreground: oklch(0.29 0.02 265);
+  --muted: oklch(0.965 0.004 265);
+  --muted-foreground: oklch(0.55 0.015 265);
+  --accent: oklch(0.95 0.02 277);
+  --accent-foreground: oklch(0.35 0.08 277);
+  --destructive: oklch(0.58 0.21 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.6 0.14 158);
+  --border: oklch(0.92 0.005 265);
+  --input: oklch(0.92 0.005 265);
+  --ring: oklch(0.54 0.21 277);
+  --canvas: oklch(0.94 0.004 265);
+  --radius: 0.75rem;
+  /* Replaced at runtime when the server bundles its own label font, which
+     makes the preview text pixel-identical to the export. */
+  --font-label: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Arial, sans-serif;
+}
+
+.dark {
+  --background: oklch(0.17 0.012 265);
+  --foreground: oklch(0.96 0.003 265);
+  --card: oklch(0.21 0.014 265);
+  --card-foreground: oklch(0.96 0.003 265);
+  --popover: oklch(0.21 0.014 265);
+  --popover-foreground: oklch(0.96 0.003 265);
+  --primary: oklch(0.68 0.17 277);
+  --primary-foreground: oklch(0.16 0.02 277);
+  --secondary: oklch(0.27 0.016 265);
+  --secondary-foreground: oklch(0.95 0.003 265);
+  --muted: oklch(0.26 0.014 265);
+  --muted-foreground: oklch(0.68 0.015 265);
+  --accent: oklch(0.31 0.045 277);
+  --accent-foreground: oklch(0.92 0.03 277);
+  --destructive: oklch(0.63 0.2 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.68 0.14 158);
+  --border: oklch(0.29 0.014 265);
+  --input: oklch(0.31 0.014 265);
+  --ring: oklch(0.68 0.17 277);
+  --canvas: oklch(0.13 0.01 265);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-canvas: var(--canvas);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
+
+  --animate-in-fade: fade-in 160ms ease-out;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--color-primary) 28%, transparent);
+  }
+}
+
+@layer utilities {
+  /* Transparency checkerboard behind images that keep an alpha channel. */
+  .bg-checkerboard {
+    background-image:
+      linear-gradient(45deg, color-mix(in oklch, var(--color-muted-foreground) 18%, transparent) 25%, transparent 25%),
+      linear-gradient(-45deg, color-mix(in oklch, var(--color-muted-foreground) 18%, transparent) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, color-mix(in oklch, var(--color-muted-foreground) 18%, transparent) 75%),
+      linear-gradient(-45deg, transparent 75%, color-mix(in oklch, var(--color-muted-foreground) 18%, transparent) 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--color-muted-foreground) 35%, transparent) transparent;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 160ms ease-out both;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

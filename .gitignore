@@ -1,0 +1,22 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Environment (only the .example files are committed)
+.env
+.env.local
+.env.*.local
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

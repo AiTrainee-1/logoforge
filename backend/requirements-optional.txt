@@ -1,0 +1,8 @@
+# Optional extras. Install only if the platform has wheels for them.
+#   pip install -r requirements-optional.txt
+
+# HEIC / HEIF (and AVIF) upload support.
+pillow-heif==0.21.0
+
+# Development / test tooling.
+pytest==8.3.4
