@@ -23,11 +23,17 @@
  * same layout numbers describe a small preview and the 925x1131 export.
  */
 import type { CanvasAsset, OverlayElement, TextAlign } from '@/types/editor'
-import { type CatalogSections, parseCatalogText } from '@/utils/catalogParser'
+import { type CatalogSections, parseCatalogText, withDetailMarkers } from '@/utils/catalogParser'
 import { createElement, textBoxHeight } from '@/utils/overlays'
 import { scaledPx, type Size } from '@/utils/transforms'
 
 export type CatalogSectionKey = 'title' | 'description' | 'details' | 'price'
+
+/** Both catalog page sizes - the compact 925x1131 card and the primary,
+ * high-resolution 1240x1754 sheet. Used to gate the guided setup panel. */
+export function isCatalogPreset(preset: string): preset is 'catalog' | 'catalog-large' {
+  return preset === 'catalog' || preset === 'catalog-large'
+}
 
 export interface CatalogSectionStyle {
   fontSize: number
@@ -35,20 +41,59 @@ export interface CatalogSectionStyle {
   color: string
   align: TextAlign
   lineHeight: number
+  fontFamily: OverlayElement['fontFamily']
 }
 
+/** Warm off-white - the Catalog Composer's default background (never pure
+ * white). Applied when a catalog slide is created; adjustable afterwards
+ * from the Canvas panel like any other card background. */
+export const CATALOG_BACKGROUND = '#EDEBEC'
+/** Editorial brown for the title, in the same family as the reference. */
+export const CATALOG_TITLE_COLOR = '#825542'
+/** Dark, warm charcoal (not pure black) for body copy. */
+export const CATALOG_BODY_COLOR = '#2B2B2B'
+
 /**
- * Default styling per section. All four share the app's one configured
- * catalog font (`--font-label` / the server's bundled face) - only size,
- * weight, colour, alignment and line height differ, and every one of those
- * stays independently adjustable afterwards through the ordinary per-element
- * Inspector panel.
+ * Default styling per section. All four render with the Catalog Composer's
+ * bundled serif face (`fontFamily: 'serif'` -> `--font-catalog`) - separate
+ * from `--font-label`, the face every other text element in the app (Studio
+ * labels, plain composer stamps) keeps using unchanged. Size, weight,
+ * colour, alignment and line height are independently adjustable afterwards
+ * through the ordinary per-element Inspector panel.
  */
 export const CATALOG_SECTION_DEFAULTS: Record<CatalogSectionKey, CatalogSectionStyle> = {
-  title: { fontSize: 38, bold: true, color: '#111111', align: 'center', lineHeight: 1.2 },
-  description: { fontSize: 22, bold: false, color: '#333333', align: 'center', lineHeight: 1.45 },
-  details: { fontSize: 21, bold: false, color: '#111111', align: 'center', lineHeight: 1.35 },
-  price: { fontSize: 26, bold: true, color: '#111111', align: 'center', lineHeight: 1.2 },
+  title: {
+    fontSize: 38,
+    bold: true, // renders as the bundled SemiBold - "medium, not extremely bold"
+    color: CATALOG_TITLE_COLOR,
+    align: 'center',
+    lineHeight: 1.2,
+    fontFamily: 'serif',
+  },
+  description: {
+    fontSize: 22,
+    bold: false,
+    color: CATALOG_BODY_COLOR,
+    align: 'center',
+    lineHeight: 1.45,
+    fontFamily: 'serif',
+  },
+  details: {
+    fontSize: 21,
+    bold: false,
+    color: CATALOG_BODY_COLOR,
+    align: 'center',
+    lineHeight: 1.35,
+    fontFamily: 'serif',
+  },
+  price: {
+    fontSize: 22,
+    bold: true,
+    color: CATALOG_BODY_COLOR,
+    align: 'center',
+    lineHeight: 1.2,
+    fontFamily: 'serif',
+  },
 }
 
 const SECTION_ORDER: CatalogSectionKey[] = ['title', 'description', 'details', 'price']
@@ -86,6 +131,10 @@ export interface CatalogLayoutInput {
   margins?: CatalogMargins
   /** Per-section style overrides, merged onto `CATALOG_SECTION_DEFAULTS`. */
   styles?: Partial<Record<CatalogSectionKey, Partial<CatalogSectionStyle>>>
+  /** Off by default. When true, each recognised Details label line gets a
+   * subtle marker prefix (see `withDetailMarkers`). Title/description/price
+   * are never affected. */
+  detailMarkers?: boolean
 }
 
 export interface CatalogSectionResult {
@@ -117,6 +166,7 @@ function measureHeight(frame: Size, text: string, style: CatalogSectionStyle, bo
     boxHeight: 0,
     background: 'none',
     align: style.align,
+    fontFamily: style.fontFamily,
   })
   return textBoxHeight(frame, probe)
 }
@@ -125,6 +175,9 @@ export function computeCatalogLayout(input: CatalogLayoutInput): CatalogLayoutRe
   const { frame, asset } = input
   const margins = input.margins ?? CATALOG_DEFAULT_MARGINS
   const sections: CatalogSections = parseCatalogText(input.text)
+  if (input.detailMarkers) {
+    sections.details = withDetailMarkers(sections.details)
+  }
 
   const marginTopPx = scaledPx(margins.top, frame.width)
   const marginLeftPx = scaledPx(margins.left, frame.width)
@@ -193,6 +246,7 @@ export function computeCatalogLayout(input: CatalogLayoutInput): CatalogLayoutRe
         align: base.align,
         lineHeight: base.lineHeight,
         background: 'none',
+        fontFamily: base.fontFamily,
       },
     })
     cursorY += height + sectionGapPx

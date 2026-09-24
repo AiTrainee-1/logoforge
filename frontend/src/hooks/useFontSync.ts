@@ -1,16 +1,31 @@
 /**
- * Load the server's label font into the page when one is bundled.
+ * Load the server's fonts into the page.
  *
  * `/api/capabilities` reports a font URL only for faces the deployer dropped
  * into `backend/assets/fonts`. When that happens the preview and the export
- * draw with identical glyphs; otherwise the preview falls back to Inter and
- * the match is close but not exact.
+ * draw with identical glyphs; otherwise the preview falls back to a generic
+ * face and the match is close but not exact.
+ *
+ * Two independent families are loaded:
+ *  - "default" -> `--font-label`, the original face every existing text
+ *    element (Studio's labels, plain composer stamps) already renders with.
+ *  - "serif"   -> `--font-catalog`, the Catalog Composer's editorial face.
+ * Nothing outside the Catalog Composer references `--font-catalog`, so
+ * loading it changes nothing about how Studio or plain Composer text look.
  */
 import { useEffect, useState } from 'react'
 
-import { api } from '@/services/api'
+import { api, type Capabilities } from '@/services/api'
 
-const FAMILY = 'LogoForgeLabel'
+const CSS_FAMILY: Record<string, string> = {
+  default: 'LogoForgeLabel',
+  serif: 'LogoForgeSerif',
+}
+
+const CSS_VAR: Record<string, string> = {
+  default: '--font-label',
+  serif: '--font-catalog',
+}
 
 /**
  * Server font file -> the CSS family that is the same typeface. When the
@@ -29,18 +44,23 @@ const CSS_EQUIVALENT: Record<string, string> = {
   'liberationsans-bold': 'Liberation Sans',
   'inter-regular': 'Inter',
   'inter-bold': 'Inter',
+  'crimsontext-regular': 'Crimson Text',
+  'crimsontext-semibold': 'Crimson Text',
 }
 
-const FALLBACK_STACK =
-  "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Arial, sans-serif"
+const FALLBACK_STACK: Record<string, string> = {
+  default: "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Arial, sans-serif",
+  serif: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif",
+}
 
 export interface FontSync {
   family: string | null
   serverFont: string | null
-  /** Human-friendly name of the typeface actually used ("Arial", "DejaVu
-   * Sans", …) - the one and only font the whole app (Studio, Composer,
-   * Catalog Composer) renders with, so preview and export always match. */
+  /** Human-friendly name of the "default" typeface ("Arial", "DejaVu
+   * Sans", …) - the one every existing text element already renders with. */
   displayName: string | null
+  /** Human-friendly name of the Catalog Composer's serif typeface. */
+  serifDisplayName: string | null
 }
 
 function prettify(stem: string): string {
@@ -52,57 +72,79 @@ function prettify(stem: string): string {
     .join(' ')
 }
 
+async function loadFamily(
+  key: 'default' | 'serif',
+  labelFont: string | null,
+  urls: { bold?: string; regular?: string },
+): Promise<string | null> {
+  const equivalent = CSS_EQUIVALENT[(labelFont ?? '').toLowerCase()]
+  if (equivalent) {
+    document.documentElement.style.setProperty(
+      CSS_VAR[key],
+      `'${equivalent}', ${FALLBACK_STACK[key]}`,
+    )
+  }
+
+  const faces: FontFace[] = []
+  const cssFamily = CSS_FAMILY[key]
+  if (urls.bold) faces.push(new FontFace(cssFamily, `url(${api.fileUrl(urls.bold)})`, { weight: '700' }))
+  if (urls.regular) {
+    faces.push(new FontFace(cssFamily, `url(${api.fileUrl(urls.regular)})`, { weight: '400' }))
+  }
+  if (faces.length > 0) {
+    await Promise.all(
+      faces.map(async (face) => {
+        const loaded = await face.load()
+        document.fonts.add(loaded)
+      }),
+    )
+    // A bundled face wins: identical glyphs on both sides.
+    document.documentElement.style.setProperty(
+      CSS_VAR[key],
+      `'${cssFamily}', ${FALLBACK_STACK[key]}`,
+    )
+  }
+
+  return equivalent ?? (labelFont ? prettify(labelFont) : null)
+}
+
 export function useFontSync(): FontSync {
   const [family, setFamily] = useState<string | null>(null)
   const [serverFont, setServerFont] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
+  const [serifDisplayName, setSerifDisplayName] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
     const load = async () => {
+      let capabilities: Capabilities
       try {
-        const capabilities = await api.capabilities()
-        if (cancelled) return
-        setServerFont(capabilities.labelFont ?? null)
-
-        // Even without a bundled file, ask for the same typeface by name.
-        const equivalent = CSS_EQUIVALENT[(capabilities.labelFont ?? '').toLowerCase()]
-        setDisplayName(equivalent ?? (capabilities.labelFont ? prettify(capabilities.labelFont) : null))
-        if (equivalent) {
-          document.documentElement.style.setProperty(
-            '--font-label',
-            `'${equivalent}', ${FALLBACK_STACK}`,
-          )
-        }
-
-        const urls = capabilities.fontUrls ?? {}
-        const faces: FontFace[] = []
-        if (urls.bold) {
-          faces.push(new FontFace(FAMILY, `url(${api.fileUrl(urls.bold)})`, { weight: '700' }))
-        }
-        if (urls.regular) {
-          faces.push(
-            new FontFace(FAMILY, `url(${api.fileUrl(urls.regular)})`, { weight: '400' }),
-          )
-        }
-        if (faces.length === 0) return
-
-        await Promise.all(
-          faces.map(async (face) => {
-            const loaded = await face.load()
-            document.fonts.add(loaded)
-          }),
-        )
-        if (cancelled) return
-        // A bundled face wins: identical glyphs on both sides.
-        document.documentElement.style.setProperty(
-          '--font-label',
-          `'${FAMILY}', ${FALLBACK_STACK}`,
-        )
-        setFamily(FAMILY)
+        capabilities = await api.capabilities()
       } catch {
-        // The API may be down; the preview simply uses its fallback font.
+        // The API may be down; the preview simply uses its fallback fonts.
+        return
+      }
+      if (cancelled) return
+
+      setServerFont(capabilities.labelFont ?? null)
+      const fonts = capabilities.fonts ?? {
+        default: { label: capabilities.labelFont, urls: capabilities.fontUrls ?? {} },
+      }
+
+      const defaultInfo = fonts.default
+      if (defaultInfo) {
+        const name = await loadFamily('default', defaultInfo.label, defaultInfo.urls)
+        if (!cancelled) {
+          setDisplayName(name)
+          if (Object.keys(defaultInfo.urls).length > 0) setFamily(CSS_FAMILY.default)
+        }
+      }
+
+      const serifInfo = fonts.serif
+      if (serifInfo) {
+        const name = await loadFamily('serif', serifInfo.label, serifInfo.urls)
+        if (!cancelled) setSerifDisplayName(name)
       }
     }
 
@@ -112,5 +154,5 @@ export function useFontSync(): FontSync {
     }
   }, [])
 
-  return { family, serverFont, displayName }
+  return { family, serverFont, displayName, serifDisplayName }
 }

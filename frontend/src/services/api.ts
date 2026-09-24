@@ -66,6 +66,10 @@ export interface Capabilities {
   labelFont: string
   /** Present when the server bundles a font it can also serve to the browser. */
   fontUrls: { bold?: string; regular?: string }
+  /** Named font families a text element can opt into via `fontFamily`.
+   * "default" mirrors labelFont/fontUrls above; "serif" is the Catalog
+   * Composer's editorial face. */
+  fonts?: Record<string, { label: string; urls: { bold?: string; regular?: string } }>
 }
 
 export interface ComposePayload {

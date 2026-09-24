@@ -13,6 +13,7 @@ import { Header, type Page } from '@/components/layout/Header'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
 import type { UseCompose } from '@/hooks/useCompose'
+import { isCatalogPreset } from '@/utils/catalogLayout'
 
 const IMAGE_ACCEPT =
   'image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,.avif'
@@ -32,7 +33,7 @@ export function ComposerPage({
   // silently bypass the catalog auto-layout the guided panel is about to run.
   const catalogSetup =
     compose.canvas.mode === 'card' &&
-    compose.canvas.preset === 'catalog' &&
+    isCatalogPreset(compose.canvas.preset) &&
     compose.elements.length === 0
 
   // Element shortcuts. They stay quiet while a field has focus.

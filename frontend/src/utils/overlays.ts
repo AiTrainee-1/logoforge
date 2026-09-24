@@ -67,7 +67,12 @@ export function textMetrics(frameWidth: number, element: OverlayElement): TextMe
  * match when the server's bundled font is also the one loaded in the browser.
  */
 let measureCanvas: HTMLCanvasElement | null = null
-let cachedFontFamily: string | null = null
+const cachedFontFamily: Partial<Record<OverlayElement['fontFamily'], string>> = {}
+
+const FONT_CSS_VAR: Record<OverlayElement['fontFamily'], string> = {
+  default: '--font-label',
+  serif: '--font-catalog',
+}
 
 function measureContext(): CanvasRenderingContext2D | null {
   if (typeof document === 'undefined') return null
@@ -75,12 +80,13 @@ function measureContext(): CanvasRenderingContext2D | null {
   return measureCanvas.getContext('2d')
 }
 
-function labelFontFamily(): string {
-  if (cachedFontFamily) return cachedFontFamily
-  if (typeof window === 'undefined') return 'sans-serif'
-  const value = getComputedStyle(document.documentElement).getPropertyValue('--font-label')
-  cachedFontFamily = value.trim() || 'sans-serif'
-  return cachedFontFamily
+function labelFontFamily(family: OverlayElement['fontFamily'] = 'default'): string {
+  if (cachedFontFamily[family]) return cachedFontFamily[family] as string
+  if (typeof window === 'undefined') return family === 'serif' ? 'serif' : 'sans-serif'
+  const value = getComputedStyle(document.documentElement).getPropertyValue(FONT_CSS_VAR[family])
+  const resolved = value.trim() || (family === 'serif' ? 'serif' : 'sans-serif')
+  cachedFontFamily[family] = resolved
+  return resolved
 }
 
 /** A line's rendered width, including letter-spacing gaps between glyphs. */
@@ -101,10 +107,11 @@ export function wrapLines(
   bold: boolean,
   maxWidthPx: number,
   letterSpacingPx = 0,
+  family: OverlayElement['fontFamily'] = 'default',
 ): string[] {
   const ctx = measureContext()
   if (!ctx || maxWidthPx <= 0) return text.split('\n')
-  ctx.font = `${bold ? 700 : 400} ${fontPx}px ${labelFontFamily()}`
+  ctx.font = `${bold ? 700 : 400} ${fontPx}px ${labelFontFamily(family)}`
   const wrapped: string[] = []
   for (const paragraph of text.split('\n')) {
     if (paragraph === '') {
@@ -132,7 +139,7 @@ export function textBoxLines(frame: Size, element: OverlayElement): string[] {
   const boxWidthPx = (element.boxWidth / 100) * frame.width
   const innerWidth = Math.max(1, boxWidthPx - metrics.padX * 2)
   const letterPx = scaledPx(element.letterSpacing, frame.width)
-  return wrapLines(element.text, metrics.fontPx, element.bold, innerWidth, letterPx)
+  return wrapLines(element.text, metrics.fontPx, element.bold, innerWidth, letterPx, element.fontFamily)
 }
 
 /**
@@ -189,7 +196,7 @@ export function elementStyle(
   const isBox = element.boxWidth > 0
   const style: CSSProperties = {
     ...base,
-    fontFamily: 'var(--font-label)',
+    fontFamily: element.fontFamily === 'serif' ? 'var(--font-catalog)' : 'var(--font-label)',
     fontSize: metrics.fontPx,
     lineHeight: `${metrics.lineHeightPx}px`,
     fontWeight: element.bold ? 700 : 400,
@@ -270,6 +277,7 @@ export function toPayload(element: OverlayElement) {
     backgroundOpacity: element.backgroundOpacity,
     boxWidth: element.boxWidth,
     boxHeight: element.boxHeight,
+    fontFamily: element.fontFamily,
   }
 }
 

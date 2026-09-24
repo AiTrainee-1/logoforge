@@ -23,6 +23,7 @@ from utils.fonts import load_font
 
 ALIGNMENTS = ("left", "center", "right")
 BACKGROUNDS = ("none", "shadow", "pill")
+FONT_FAMILIES = ("default", "serif")
 
 MAX_TEXT_LENGTH = 4000
 MAX_LINES = 80
@@ -61,12 +62,19 @@ class TextStyle:
     background_color: str = "#000000"
     background_opacity: float = 45.0
     letter_spacing: float = 0.0
+    # Which bundled family (see utils/fonts.py) this text renders with.
+    # "default" is the original face every existing text element already
+    # uses; only the Catalog Composer's sections opt into anything else.
+    font_family: str = "default"
 
     @classmethod
     def from_payload(cls, data) -> "TextStyle":
         data = data or {}
         align = str(data.get("align") or "center").lower()
         background = str(data.get("background") or "shadow").lower()
+        font_family = str(data.get("fontFamily") or "default").lower()
+        if font_family not in FONT_FAMILIES:
+            font_family = "default"
         return cls(
             font_size=clamp(as_float(data.get("fontSize"), 40.0), 4.0, 600.0),
             line_height=clamp(as_float(data.get("lineHeight"), 1.2), 0.6, 3.0),
@@ -77,6 +85,7 @@ class TextStyle:
             background_color=normalise_hex(data.get("backgroundColor"), "#000000"),
             background_opacity=clamp(as_float(data.get("backgroundOpacity"), 45.0), 0.0, 100.0),
             letter_spacing=clamp(as_float(data.get("letterSpacing"), 0.0), -20.0, 200.0),
+            font_family=font_family,
         )
 
 
@@ -184,7 +193,7 @@ def render_text_block(text: str, frame_w: int, style: TextStyle, opacity: float 
     pad_y = metrics["padY"]
     line_h = metrics["lineHeightPx"]
 
-    font = load_font(font_px, style.bold)
+    font = load_font(font_px, style.bold, style.font_family)
     lines = text.split("\n") if text else [""]
     letter_px = scaled_px(style.letter_spacing, frame_w)
 
@@ -261,7 +270,7 @@ def render_text_box(
     line_h = metrics["lineHeightPx"]
     letter_px = scaled_px(style.letter_spacing, frame_w)
 
-    font = load_font(font_px, style.bold)
+    font = load_font(font_px, style.bold, style.font_family)
     probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
     inner_width = max(1.0, box_width_px - pad_x * 2)
     lines = wrap_lines(probe, text, font, inner_width, letter_px)

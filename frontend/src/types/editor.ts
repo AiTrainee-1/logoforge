@@ -217,6 +217,13 @@ export interface OverlayElement {
   /** Target box height, percent of frame height. 0/too small = auto - the
    * box always grows to fit its wrapped content; text is never clipped. */
   boxHeight: number
+  /**
+   * Which bundled font family this text renders with. "default" is the
+   * original face every existing text element (Studio's extra letters,
+   * plain composer stamps) already uses - only the Catalog Composer's
+   * generated sections opt into "serif".
+   */
+  fontFamily: 'default' | 'serif'
 
   // image elements
   assetId: string
@@ -241,6 +248,7 @@ export const DEFAULT_ELEMENT: Omit<OverlayElement, 'id'> = {
   backgroundOpacity: 45,
   boxWidth: 0,
   boxHeight: 0,
+  fontFamily: 'default',
   assetId: '',
   widthPercent: 20,
 }
@@ -266,6 +274,7 @@ export type CardPreset =
   | 'portrait-1080'
   | 'story-1080'
   | 'catalog'
+  | 'catalog-large'
   | 'custom'
 
 export interface CanvasSettings {

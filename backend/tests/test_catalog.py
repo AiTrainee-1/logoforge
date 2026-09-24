@@ -127,6 +127,71 @@ def test_catalog_preset_is_925x1131():
     }
 
 
+def test_catalog_large_preset_is_1240x1754():
+    assert CARD_PRESETS["catalog-large"] == {
+        "width": 1240,
+        "height": 1754,
+        "label": "Catalog sheet (1240x1754)",
+    }
+
+
+# --- serif font family (Catalog Composer only) --------------------------------
+
+
+def test_serif_family_resolves_to_a_different_file_than_default():
+    from utils.fonts import font_path
+
+    default_bold = font_path(True, "default")
+    serif_bold = font_path(True, "serif")
+    assert serif_bold is not None
+    assert serif_bold.name == "CrimsonText-SemiBold.ttf"
+    assert serif_bold != default_bold
+
+
+def test_font_family_defaults_to_default_for_every_existing_caller():
+    """Studio labels and plain (non-catalog) text elements never send
+    fontFamily, so they must keep resolving to the original face."""
+    element = OverlayElement.from_payload({"type": "text", "text": "A"})
+    assert element.style.font_family == "default"
+
+
+def test_unknown_font_family_falls_back_to_default():
+    element = OverlayElement.from_payload({"type": "text", "text": "A", "fontFamily": "nonsense"})
+    assert element.style.font_family == "default"
+
+
+def test_serif_element_renders_with_the_serif_face(tmp_path):
+    """box_width text with fontFamily='serif' must actually use the serif
+    font, not silently fall back to the default face."""
+    boxed = OverlayElement.from_payload(
+        {
+            "type": "text",
+            "text": "Vintage wooden Peacock",
+            "fontSize": 44,
+            "boxWidth": 80,
+            "background": "none",
+            "fontFamily": "serif",
+        }
+    )
+    assert boxed.style.font_family == "serif"
+    frame = Image.new("RGBA", (1240, 1754), (237, 235, 236, 255))
+    result = render_element(frame, boxed, {})
+    assert result.size == (1240, 1754)
+
+
+def test_capabilities_expose_both_font_families(client):
+    payload = client.get("/api/capabilities").get_json()
+    assert "default" in payload["fonts"]
+    assert "serif" in payload["fonts"]
+    assert payload["fonts"]["serif"]["label"] == "CrimsonText-SemiBold"
+    assert payload["fonts"]["serif"]["urls"].get("bold", "").endswith(
+        "/api/fonts/CrimsonText-SemiBold.ttf"
+    )
+    assert payload["fonts"]["serif"]["urls"].get("regular", "").endswith(
+        "/api/fonts/CrimsonText-Regular.ttf"
+    )
+
+
 # --- full compose API: catalog card -------------------------------------------
 
 
@@ -166,6 +231,103 @@ def test_catalog_export_is_exactly_925x1131(client):
     assert (body["width"], body["height"]) == (925, 1131)
     with Image.open(io.BytesIO(fetch(client, job["jobId"]).data)) as image:
         assert image.size == (925, 1131)
+
+
+def test_catalog_large_export_is_exactly_1240x1754(client):
+    job = upload(client, [("product.jpg", make_image(3000, 4000, (200, 120, 40)))])
+    image_id = job["images"][0]["id"]
+    body = compose(
+        client,
+        job["jobId"],
+        mode="card",
+        preset="catalog-large",
+        background="#EDEBEC",
+        elements=[
+            {
+                "type": "text",
+                "text": "Vintage wooden Peacock",
+                "x": 50,
+                "y": 8,
+                "boxWidth": 80,
+                "fontSize": 40,
+                "bold": True,
+                "align": "center",
+                "background": "none",
+                "color": "#825542",
+                "fontFamily": "serif",
+            },
+            {"type": "image", "assetId": image_id, "x": 50, "y": 75, "widthPercent": 60},
+        ],
+    ).get_json()
+    assert (body["width"], body["height"]) == (1240, 1754)
+    with Image.open(io.BytesIO(fetch(client, job["jobId"]).data)) as image:
+        assert image.size == (1240, 1754)
+
+
+def test_reference_catalog_content_renders_at_1240x1754_without_clipping(client):
+    """Exercises the exact reference text/measurements from the spec, as the
+    frontend's auto-layout would actually send them: title + description +
+    details + price, each its own element, serif family, brown title."""
+    reference_text = (
+        "Vintage wooden Peacock\n\n"
+        "A finely hand carved wooden peacock, this vintage piece reflects the "
+        "quiet elegance of South Indian craftsmanship. Its gentle wear and "
+        "softened edges speak of age, preservation, and enduring artistry. "
+        "Symbolic of beauty and auspicious presence, the mayura, vahana of "
+        "Lord Kartikeya adds cultural depth to this refined artefact.\n\n"
+        "Ideal for consoles, entryways, or curated interior displays.\n\n"
+        'Dimensions: 23.5"H\n'
+        "Weight: 4.7kg approx.\n\n"
+        "Price: Rs. 25,000/- (shipping additional)"
+    )
+    job = upload(client, [("peacock.jpg", make_image(2400, 3200, (120, 90, 60)))])
+    image_id = job["images"][0]["id"]
+
+    def text_el(y, text, font_size, color, bold, box_width=80):
+        return {
+            "type": "text",
+            "text": text,
+            "x": 50,
+            "y": y,
+            "boxWidth": box_width,
+            "fontSize": font_size,
+            "bold": bold,
+            "align": "center",
+            "background": "none",
+            "color": color,
+            "fontFamily": "serif",
+        }
+
+    compose(
+        client,
+        job["jobId"],
+        mode="card",
+        preset="catalog-large",
+        background="#EDEBEC",
+        elements=[
+            text_el(6, "Vintage wooden Peacock", 44, "#825542", True),
+            text_el(
+                16,
+                "A finely hand carved wooden peacock, this vintage piece reflects the "
+                "quiet elegance of South Indian craftsmanship.",
+                24,
+                "#2B2B2B",
+                False,
+            ),
+            text_el(26, 'Dimensions: 23.5"H\nWeight: 4.7kg approx.', 21, "#2B2B2B", False),
+            text_el(32, "Price: Rs. 25,000/- (shipping additional)", 23, "#2B2B2B", True),
+            {"type": "image", "assetId": image_id, "x": 50, "y": 70, "widthPercent": 65},
+        ],
+    )
+    with Image.open(io.BytesIO(fetch(client, job["jobId"]).data)) as image:
+        assert image.size == (1240, 1754)
+        rgb = image.convert("RGB")
+        # The brown title must actually be present near its own row.
+        title_row_y = round(0.06 * 1754)
+        title_pixels = [rgb.getpixel((x, title_row_y)) for x in range(300, 940, 10)]
+        assert any(p[0] > 100 and p[0] > p[2] + 20 for p in title_pixels), "brown title ink"
+        # Background stays the configured warm off-white, not pure white.
+        assert rgb.getpixel((20, 20)) == (0xED, 0xEB, 0xEC)
 
 
 def test_catalog_image_element_keeps_the_source_aspect_ratio(client):

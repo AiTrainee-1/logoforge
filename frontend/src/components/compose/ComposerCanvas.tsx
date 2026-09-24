@@ -12,6 +12,7 @@ import { CatalogSetup } from '@/components/compose/CatalogSetup'
 import { OverlayLayer } from '@/components/editor/OverlayLayer'
 import type { UseCompose } from '@/hooks/useCompose'
 import { cn } from '@/lib/utils'
+import { isCatalogPreset } from '@/utils/catalogLayout'
 
 const PADDING = 48
 
@@ -38,7 +39,7 @@ export function ComposerCanvas({
 
   const { canvas, frame, baseImage, elements, assetMap } = compose
   const empty = canvas.mode === 'image' && !baseImage
-  const catalogSetup = canvas.mode === 'card' && canvas.preset === 'catalog' && elements.length === 0
+  const catalogSetup = canvas.mode === 'card' && isCatalogPreset(canvas.preset) && elements.length === 0
 
   const available = {
     width: Math.max(80, box.width - PADDING),

@@ -37,10 +37,11 @@ function Shell() {
       onStart={() => setPage('studio')}
       onOpenComposer={() => setPage('composer')}
       onOpenCatalog={() => {
-        // A fresh catalog card, so the guided upload + paste panel shows up
-        // right away instead of whatever the general image editor left behind.
+        // A fresh catalog sheet (the primary, high-resolution 1240x1754
+        // format), so the guided upload + paste panel shows up right away
+        // instead of whatever the general image editor left behind.
         if (!compose.elements.length) {
-          compose.setCanvas({ mode: 'card', preset: 'catalog' })
+          compose.setCanvas({ mode: 'card', preset: 'catalog-large' })
         }
         setPage('composer')
       }}

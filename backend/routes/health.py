@@ -43,5 +43,12 @@ def capabilities():
             # Present only when a font was deliberately bundled; the preview
             # then renders with the exact face the export uses.
             "fontUrls": bundled_font_file(),
+            # Named families a text element can opt into via `fontFamily`.
+            # "default" duplicates labelFont/fontUrls above for convenience;
+            # "serif" is the Catalog Composer's editorial face.
+            "fonts": {
+                "default": {"label": font_family_name(True, "default"), "urls": bundled_font_file("default")},
+                "serif": {"label": font_family_name(True, "serif"), "urls": bundled_font_file("serif")},
+            },
         }
     )

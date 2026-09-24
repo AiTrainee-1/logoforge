@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { parseCatalogText } from './catalogParser.ts'
+import { parseCatalogText, withDetailMarkers } from './catalogParser.ts'
 
 const FULL_CATALOG_TEXT = `Terracotta Votive figure | Aiyanar Tradition
 
@@ -23,6 +23,36 @@ D: 10" x 4.5" x 4.5"
 Weight: 1.175 kg
 
 Price: Rs.10500/- (Shipping additional) - for each piece`
+
+test('Dimensions/Weight/Price on consecutive lines (no blank lines between them) still split correctly', () => {
+  // This is exactly how the task's own reference content is formatted -
+  // Price sits right after Weight with no blank line, so paragraph-level
+  // classification alone would swallow it into Details.
+  const result = parseCatalogText(
+    'Vintage wooden Peacock\n\n' +
+      'A short description paragraph.\n\n' +
+      'Dimensions: 23.5"H\n' +
+      'Weight: 4.7kg approx.\n' +
+      'Price: Rs. 25,000/- (shipping additional)',
+  )
+  assert.equal(result.title, 'Vintage wooden Peacock')
+  assert.equal(result.description, 'A short description paragraph.')
+  assert.equal(result.details, 'Dimensions: 23.5"H\n\nWeight: 4.7kg approx.')
+  assert.equal(result.price, 'Price: Rs. 25,000/- (shipping additional)')
+})
+
+test('a multi-line Dimensions entry followed by Weight/Price on the next lines splits correctly', () => {
+  const result = parseCatalogText(
+    'Title\n\n' +
+      'Dimensions:\n' +
+      'C: 12" x 5.5" x 4"\n' +
+      'D: 10" x 4.5" x 4.5"\n' +
+      'Weight: 1.175 kg\n' +
+      'Price: Rs.10500/-',
+  )
+  assert.equal(result.details, 'Dimensions:\nC: 12" x 5.5" x 4"\nD: 10" x 4.5" x 4.5"\n\nWeight: 1.175 kg')
+  assert.equal(result.price, 'Price: Rs.10500/-')
+})
 
 test('title + description + details + price: the full reference structure', () => {
   const result = parseCatalogText(FULL_CATALOG_TEXT)
@@ -138,4 +168,27 @@ test('exact user text survives, including quotes and multiple detail lines', () 
   for (const word of FULL_CATALOG_TEXT.split(/\s+/)) {
     assert.ok(rebuilt.includes(word), `expected "${word}" to survive parsing`)
   }
+})
+
+// --- optional detail markers (off by default) --------------------------------
+
+test('withDetailMarkers prefixes only recognised label lines', () => {
+  const details = 'Material: Terracotta\n\nDimensions:\nC: 12" x 5.5" x 4"\nWeight: 1.175 kg'
+  const marked = withDetailMarkers(details)
+  assert.equal(
+    marked,
+    '– Material: Terracotta\n\n– Dimensions:\nC: 12" x 5.5" x 4"\n– Weight: 1.175 kg',
+  )
+})
+
+test('withDetailMarkers leaves an empty details section untouched', () => {
+  assert.equal(withDetailMarkers(''), '')
+})
+
+test('withDetailMarkers never touches continuation lines under a label', () => {
+  const marked = withDetailMarkers('Dimensions:\nC: 12" x 5.5" x 4"\nD: 10" x 4.5" x 4.5"')
+  const lines = marked.split('\n')
+  assert.equal(lines[0], '– Dimensions:')
+  assert.equal(lines[1], 'C: 12" x 5.5" x 4"')
+  assert.equal(lines[2], 'D: 10" x 4.5" x 4.5"')
 })

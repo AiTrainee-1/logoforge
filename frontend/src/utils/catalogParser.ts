@@ -49,6 +49,8 @@ function splitParagraphs(text: string): string[] {
     .filter(Boolean)
 }
 
+type Bucket = 'description' | 'details' | 'price'
+
 export function parseCatalogText(raw: string): CatalogSections {
   const paragraphs = splitParagraphs(raw)
   if (paragraphs.length === 0) {
@@ -60,15 +62,40 @@ export function parseCatalogText(raw: string): CatalogSections {
   const detailsParts: string[] = []
   const priceParts: string[] = []
 
+  // Classified line by line, not paragraph by paragraph: a catalog paste
+  // often runs "Dimensions:", "Weight:" and "Price:" on consecutive lines
+  // with no blank line between them. A label or the price pattern starts a
+  // new field *within* the same paragraph; any other line continues
+  // whatever field is already open (e.g. the "C:"/"D:" rows under
+  // "Dimensions:"), or starts the description if nothing has opened yet.
   for (const paragraph of paragraphs.slice(1)) {
-    const firstLine = paragraph.split('\n', 1)[0]
-    if (PRICE_PATTERN.test(firstLine)) {
-      priceParts.push(paragraph)
-    } else if (LABEL_PATTERN.test(firstLine)) {
-      detailsParts.push(paragraph)
-    } else {
-      descriptionParts.push(paragraph)
+    let current: Bucket | null = null
+    let buffer: string[] = []
+
+    const flush = () => {
+      if (buffer.length === 0) return
+      const text = buffer.join('\n')
+      if (current === 'price') priceParts.push(text)
+      else if (current === 'details') detailsParts.push(text)
+      else descriptionParts.push(text)
+      buffer = []
     }
+
+    for (const line of paragraph.split('\n')) {
+      if (PRICE_PATTERN.test(line)) {
+        flush()
+        current = 'price'
+        buffer = [line]
+      } else if (LABEL_PATTERN.test(line)) {
+        flush()
+        current = 'details'
+        buffer = [line]
+      } else {
+        if (current === null) current = 'description'
+        buffer.push(line)
+      }
+    }
+    flush()
   }
 
   return {
@@ -77,4 +104,20 @@ export function parseCatalogText(raw: string): CatalogSections {
     details: detailsParts.join('\n\n'),
     price: priceParts.join('\n\n'),
   }
+}
+
+/**
+ * Optional, off by default: prefix each recognised detail-field's label line
+ * with a subtle marker. Plain text through the same renderer every other
+ * line already goes through - not an icon asset, not an emoji, and never
+ * applied to title/description/price. Only lines that already matched
+ * `LABEL_PATTERN` are touched; continuation lines (e.g. the "C:"/"D:" rows
+ * under "Dimensions:") are left exactly as the user wrote them.
+ */
+export function withDetailMarkers(details: string, marker = '–'): string {
+  if (!details) return details
+  return details
+    .split('\n')
+    .map((line) => (LABEL_PATTERN.test(line) ? `${marker} ${line}` : line))
+    .join('\n')
 }

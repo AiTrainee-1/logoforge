@@ -18,7 +18,7 @@ import type {
   OverlayElement,
 } from '@/types/editor'
 import { DEFAULT_CANVAS } from '@/types/editor'
-import { type CatalogMargins, computeCatalogLayout } from '@/utils/catalogLayout'
+import { CATALOG_BACKGROUND, type CatalogMargins, computeCatalogLayout } from '@/utils/catalogLayout'
 import { clampElement, createElement, elementsPayload, ELEMENT_LIMIT } from '@/utils/overlays'
 import { clamp, type Size } from '@/utils/transforms'
 
@@ -30,6 +30,7 @@ export const CARD_PRESETS: Record<Exclude<CardPreset, 'custom'>, Size & { label:
   'portrait-1080': { width: 1080, height: 1350, label: 'Portrait 4:5' },
   'story-1080': { width: 1080, height: 1920, label: 'Story 9:16' },
   catalog: { width: 925, height: 1131, label: 'Catalog card' },
+  'catalog-large': { width: 1240, height: 1754, label: 'Catalog sheet' },
 }
 
 const HISTORY_LIMIT = 60
@@ -60,12 +61,17 @@ export interface UseCompose {
   addImageElement: (assetId: string) => void
   /** Uploads the product photo as a plain asset - no element yet. */
   uploadCatalogImage: (file: File) => Promise<CanvasAsset | null>
-  /** Auto-layout: switches to the catalog card and creates the text box +
-   * image element in one step (one undo entry for the whole slide). */
+  /** Auto-layout: switches to the catalog card and creates the title/
+   * description/details/price + image elements in one step (one undo entry
+   * for the whole slide). */
   createCatalogSlide: (
     text: string,
     assetId: string,
-    margins?: CatalogMargins,
+    options?: {
+      preset?: 'catalog' | 'catalog-large'
+      margins?: CatalogMargins
+      detailMarkers?: boolean
+    },
   ) => { fontSizeReduced: boolean } | null
   select: (id: string | null) => void
   update: (id: string, patch: Partial<OverlayElement>, commit?: boolean) => void
@@ -257,10 +263,21 @@ export function useCompose(onError: (message: string) => void): UseCompose {
   )
 
   const createCatalogSlide = useCallback(
-    (text: string, assetId: string, margins?: CatalogMargins) => {
+    (
+      text: string,
+      assetId: string,
+      options?: { preset?: 'catalog' | 'catalog-large'; margins?: CatalogMargins; detailMarkers?: boolean },
+    ) => {
       const asset = assets.find((item) => item.id === assetId)
-      const target = CARD_PRESETS.catalog
-      const layout = computeCatalogLayout({ frame: target, text, asset, margins })
+      const presetKey = options?.preset ?? 'catalog-large'
+      const target = CARD_PRESETS[presetKey]
+      const layout = computeCatalogLayout({
+        frame: target,
+        text,
+        asset,
+        margins: options?.margins,
+        detailMarkers: options?.detailMarkers,
+      })
 
       // One element per recognised section (title/description/details/price)
       // - each is an ordinary text-box element, independently selectable,
@@ -275,9 +292,10 @@ export function useCompose(onError: (message: string) => void): UseCompose {
       setCanvasState((current) => ({
         ...current,
         mode: 'card',
-        preset: 'catalog',
+        preset: presetKey,
         width: target.width,
         height: target.height,
+        background: CATALOG_BACKGROUND,
       }))
       mutate((current) => [...current, ...textElements, ...(imageElement ? [imageElement] : [])])
       // Select the title (first section) so its controls show right away.

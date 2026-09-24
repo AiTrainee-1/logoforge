@@ -46,6 +46,7 @@ CARD_PRESETS = {
     "portrait-1080": {"width": 1080, "height": 1350, "label": "Portrait 4:5"},
     "story-1080": {"width": 1080, "height": 1920, "label": "Story 9:16"},
     "catalog": {"width": 925, "height": 1131, "label": "Catalog card (925x1131)"},
+    "catalog-large": {"width": 1240, "height": 1754, "label": "Catalog sheet (1240x1754)"},
 }
 
 MAX_SIDE = 10000
