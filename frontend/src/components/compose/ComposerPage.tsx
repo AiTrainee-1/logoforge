@@ -26,6 +26,14 @@ export function ComposerPage({
 }) {
   const baseInput = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+  // While the guided catalog panel is up, the top toolbar's own "Upload
+  // image" button must not be usable - it calls uploadBase(), which (in card
+  // mode) auto-places a generically-positioned image element and would
+  // silently bypass the catalog auto-layout the guided panel is about to run.
+  const catalogSetup =
+    compose.canvas.mode === 'card' &&
+    compose.canvas.preset === 'catalog' &&
+    compose.elements.length === 0
 
   // Element shortcuts. They stay quiet while a field has focus.
   useEffect(() => {
@@ -111,84 +119,89 @@ export function ComposerPage({
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault()
+            // The guided panel is the only accepted way to add the product
+            // image while it is showing - a stray drop must not bypass it.
+            if (catalogSetup) return
             acceptBase(event.dataTransfer.files)
           }}
         >
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <Button size="sm" onClick={() => baseInput.current?.click()}>
-                <UploadCloud className="size-3.5" />
-                {compose.baseImage ? 'Replace image' : 'Upload image'}
-              </Button>
-              <input
-                ref={baseInput}
-                type="file"
-                accept={IMAGE_ACCEPT}
-                className="hidden"
-                onChange={(event) => {
-                  acceptBase(event.target.files)
-                  event.target.value = ''
-                }}
-              />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={compose.undo}
-                disabled={!compose.canUndo}
-                title="Undo (Ctrl+Z)"
-                aria-label="Undo"
-              >
-                <Undo2 className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={compose.redo}
-                disabled={!compose.canRedo}
-                title="Redo (Ctrl+Shift+Z)"
-                aria-label="Redo"
-              >
-                <Redo2 className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={!compose.selectedId}
-                onClick={() => compose.selectedId && compose.remove(compose.selectedId)}
-                title="Delete the selected element"
-                aria-label="Delete element"
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
-            </div>
+          {!catalogSetup ? (
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" onClick={() => baseInput.current?.click()}>
+                  <UploadCloud className="size-3.5" />
+                  {compose.baseImage ? 'Replace image' : 'Upload image'}
+                </Button>
+                <input
+                  ref={baseInput}
+                  type="file"
+                  accept={IMAGE_ACCEPT}
+                  className="hidden"
+                  onChange={(event) => {
+                    acceptBase(event.target.files)
+                    event.target.value = ''
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={compose.undo}
+                  disabled={!compose.canUndo}
+                  title="Undo (Ctrl+Z)"
+                  aria-label="Undo"
+                >
+                  <Undo2 className="size-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={compose.redo}
+                  disabled={!compose.canRedo}
+                  title="Redo (Ctrl+Shift+Z)"
+                  aria-label="Redo"
+                >
+                  <Redo2 className="size-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={!compose.selectedId}
+                  onClick={() => compose.selectedId && compose.remove(compose.selectedId)}
+                  title="Delete the selected element"
+                  aria-label="Delete element"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
 
-            <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => compose.setViewZoom(compose.viewZoom - 0.1)}
-                aria-label="Zoom out the view"
-              >
-                <Minus className="size-3.5" />
-              </Button>
-              <button
-                type="button"
-                onClick={() => compose.setViewZoom(1)}
-                className="w-14 font-mono text-[12px] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
-                title="This view zoom never changes the export"
-              >
-                {Math.round(compose.viewZoom * 100)}%
-              </button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => compose.setViewZoom(compose.viewZoom + 0.1)}
-                aria-label="Zoom in the view"
-              >
-                <Plus className="size-3.5" />
-              </Button>
+              <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => compose.setViewZoom(compose.viewZoom - 0.1)}
+                  aria-label="Zoom out the view"
+                >
+                  <Minus className="size-3.5" />
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => compose.setViewZoom(1)}
+                  className="w-14 font-mono text-[12px] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
+                  title="This view zoom never changes the export"
+                >
+                  {Math.round(compose.viewZoom * 100)}%
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => compose.setViewZoom(compose.viewZoom + 0.1)}
+                  aria-label="Zoom in the view"
+                >
+                  <Plus className="size-3.5" />
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <ComposerCanvas
             compose={compose}
@@ -196,10 +209,12 @@ export function ComposerPage({
           />
         </main>
 
-        <ComposerSidebar
-          compose={compose}
-          className="w-full shrink-0 border-t border-border bg-card/40 p-4 lg:w-[364px] lg:border-t-0 lg:border-l"
-        />
+        {!catalogSetup ? (
+          <ComposerSidebar
+            compose={compose}
+            className="w-full shrink-0 border-t border-border bg-card/40 p-4 lg:w-[364px] lg:border-t-0 lg:border-l"
+          />
+        ) : null}
       </div>
     </div>
   )

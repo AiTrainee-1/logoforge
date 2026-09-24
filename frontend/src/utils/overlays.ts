@@ -55,6 +55,99 @@ export function textMetrics(frameWidth: number, element: OverlayElement): TextMe
   }
 }
 
+/**
+ * Word-wrap measurement for text boxes (the catalog text box).
+ *
+ * Mirrors `text_service.wrap_lines`: greedy word-wrap, explicit newlines stay
+ * paragraph breaks, and a single word wider than the box is kept whole
+ * rather than split. Uses an offscreen canvas 2D context so the wrap point
+ * tracks the actual glyph widths of the preview font - the same approach the
+ * server uses with Pillow's own metrics. As with every other preview/export
+ * pairing in this app, geometry matches exactly; the exact glyph shapes only
+ * match when the server's bundled font is also the one loaded in the browser.
+ */
+let measureCanvas: HTMLCanvasElement | null = null
+let cachedFontFamily: string | null = null
+
+function measureContext(): CanvasRenderingContext2D | null {
+  if (typeof document === 'undefined') return null
+  if (!measureCanvas) measureCanvas = document.createElement('canvas')
+  return measureCanvas.getContext('2d')
+}
+
+function labelFontFamily(): string {
+  if (cachedFontFamily) return cachedFontFamily
+  if (typeof window === 'undefined') return 'sans-serif'
+  const value = getComputedStyle(document.documentElement).getPropertyValue('--font-label')
+  cachedFontFamily = value.trim() || 'sans-serif'
+  return cachedFontFamily
+}
+
+/** A line's rendered width, including letter-spacing gaps between glyphs. */
+export function lineWidthPx(
+  ctx: CanvasRenderingContext2D,
+  line: string,
+  letterSpacingPx = 0,
+): number {
+  if (!line) return 0
+  let width = ctx.measureText(line).width
+  if (letterSpacingPx && line.length > 1) width += letterSpacingPx * (line.length - 1)
+  return width
+}
+
+export function wrapLines(
+  text: string,
+  fontPx: number,
+  bold: boolean,
+  maxWidthPx: number,
+  letterSpacingPx = 0,
+): string[] {
+  const ctx = measureContext()
+  if (!ctx || maxWidthPx <= 0) return text.split('\n')
+  ctx.font = `${bold ? 700 : 400} ${fontPx}px ${labelFontFamily()}`
+  const wrapped: string[] = []
+  for (const paragraph of text.split('\n')) {
+    if (paragraph === '') {
+      wrapped.push('')
+      continue
+    }
+    let line = ''
+    for (const word of paragraph.split(' ')) {
+      const candidate = line ? `${line} ${word}` : word
+      if (!line || lineWidthPx(ctx, candidate, letterSpacingPx) <= maxWidthPx) {
+        line = candidate
+      } else {
+        wrapped.push(line)
+        line = word
+      }
+    }
+    wrapped.push(line)
+  }
+  return wrapped.length ? wrapped : ['']
+}
+
+/** The wrapped lines a text-box element would render, at its current width. */
+export function textBoxLines(frame: Size, element: OverlayElement): string[] {
+  const metrics = textMetrics(frame.width, element)
+  const boxWidthPx = (element.boxWidth / 100) * frame.width
+  const innerWidth = Math.max(1, boxWidthPx - metrics.padX * 2)
+  const letterPx = scaledPx(element.letterSpacing, frame.width)
+  return wrapLines(element.text, metrics.fontPx, element.bold, innerWidth, letterPx)
+}
+
+/**
+ * The box's rendered height: always tall enough for its wrapped content.
+ * `boxHeight` (percent of frame) is a target only, never a clip - mirrors
+ * `text_service.render_text_box`.
+ */
+export function textBoxHeight(frame: Size, element: OverlayElement): number {
+  const metrics = textMetrics(frame.width, element)
+  const lines = textBoxLines(frame, element)
+  const contentHeight = metrics.lineHeightPx * lines.length + metrics.padY * 2
+  const targetHeight = (element.boxHeight / 100) * frame.height
+  return Math.max(targetHeight, contentHeight)
+}
+
 /** Drawn size of an image element, in frame pixels. */
 export function imageElementSize(
   frame: Size,
@@ -93,16 +186,26 @@ export function elementStyle(
   // selection outline and handles at full strength.
   const alpha = clamp(element.opacity, 0, 100)
   const metrics = textMetrics(frame.width, element)
+  const isBox = element.boxWidth > 0
   const style: CSSProperties = {
     ...base,
     fontFamily: 'var(--font-label)',
     fontSize: metrics.fontPx,
     lineHeight: `${metrics.lineHeightPx}px`,
     fontWeight: element.bold ? 700 : 400,
+    letterSpacing: scaledPx(element.letterSpacing, frame.width),
     padding: `${metrics.padY}px ${metrics.padX}px`,
     color: rgba(element.color, alpha),
     textAlign: element.align as TextAlign,
-    whiteSpace: 'pre',
+    whiteSpace: isBox ? 'pre-wrap' : 'pre',
+  }
+
+  if (isBox) {
+    style.width = (element.boxWidth / 100) * frame.width
+    style.height = textBoxHeight(frame, element)
+    style.wordBreak = 'break-word'
+    style.overflowWrap = 'break-word'
+    style.boxSizing = 'border-box'
   }
 
   if (element.background === 'pill') {
@@ -120,6 +223,10 @@ export function elementStyle(
   return style
 }
 
+export const BOX_WIDTH_MIN = 5
+export const BOX_WIDTH_MAX = 200
+export const BOX_HEIGHT_MAX = 400
+
 export function clampElement(element: OverlayElement): OverlayElement {
   return {
     ...element,
@@ -129,6 +236,9 @@ export function clampElement(element: OverlayElement): OverlayElement {
     opacity: clamp(element.opacity, 0, 100),
     fontSize: clamp(element.fontSize, FONT_SIZE_MIN, FONT_SIZE_MAX),
     lineHeight: clamp(element.lineHeight, 0.6, 3),
+    letterSpacing: clamp(element.letterSpacing, -20, 200),
+    boxWidth: element.boxWidth > 0 ? clamp(element.boxWidth, BOX_WIDTH_MIN, BOX_WIDTH_MAX) : 0,
+    boxHeight: clamp(element.boxHeight, 0, BOX_HEIGHT_MAX),
     widthPercent: clamp(element.widthPercent, ELEMENT_WIDTH_MIN, ELEMENT_WIDTH_MAX),
   }
 }
@@ -151,12 +261,15 @@ export function toPayload(element: OverlayElement) {
     text: element.text,
     fontSize: element.fontSize,
     lineHeight: element.lineHeight,
+    letterSpacing: element.letterSpacing,
     color: element.color,
     bold: element.bold,
     align: element.align,
     background: element.background,
     backgroundColor: element.backgroundColor,
     backgroundOpacity: element.backgroundOpacity,
+    boxWidth: element.boxWidth,
+    boxHeight: element.boxHeight,
   }
 }
 

@@ -28,6 +28,7 @@ def test_capabilities(client):
     assert payload["limits"]["maxImages"] >= 1
     assert ".jpg" in payload["accept"]["images"]
     assert payload["exportPresets"]["instagram-portrait"] == {"width": 1080, "height": 1350}
+    assert payload["exportPresets"]["925x1131"] == {"width": 925, "height": 1131}
 
 
 def test_upload_reports_real_dimensions(client, sample_files):
@@ -98,6 +99,17 @@ def test_instagram_export_only_resizes_when_asked(client):
     process(client, job_id, export={"format": "instagram-portrait"})
     results = client.get("/api/jobs/%s/results" % job_id).get_json()["results"]
     assert (results[0]["width"], results[0]["height"]) == (1080, 1350)
+
+
+def test_925x1131_export_via_api(client):
+    job = upload(client, [("shot.jpg", make_image(2000, 1500))])
+    job_id = job["jobId"]
+    process(client, job_id, export={"format": "925x1131"})
+    results = client.get("/api/jobs/%s/results" % job_id).get_json()["results"]
+    assert (results[0]["width"], results[0]["height"]) == (925, 1131)
+    data = client.get(results[0]["downloadUrl"]).data
+    with Image.open(io.BytesIO(data)) as image:
+        assert image.size == (925, 1131)
 
 
 def test_labels_follow_the_requested_order(client, sample_files):

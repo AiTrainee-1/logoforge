@@ -36,6 +36,11 @@ def test_instagram_presets(preset, expected):
     assert compute_frame(4000, 3000, export(format=preset)) == expected
 
 
+def test_925x1131_preset():
+    assert compute_frame(4000, 3000, export(format="925x1131")) == (925, 1131)
+    assert compute_frame(500, 500, export(format="925x1131")) == (925, 1131)
+
+
 def test_unknown_export_falls_back_to_original():
     assert compute_frame(1200, 800, export(format="nonsense")) == (1200, 800)
 

@@ -9,7 +9,13 @@ from PIL import Image
 from services.image_processor import render
 from services.label_service import LabelSettings
 from services.overlay_service import OverlayElement, parse_elements
-from services.text_service import TextStyle, render_text_block, text_metrics
+from services.text_service import (
+    MAX_LINES,
+    MAX_TEXT_LENGTH,
+    TextStyle,
+    render_text_block,
+    text_metrics,
+)
 from tests.conftest import make_image, make_logo
 from tests.test_processing import meta, open_result, spec, write
 
@@ -236,10 +242,14 @@ def test_non_list_payload_is_ignored():
 
 
 def test_text_is_trimmed_and_line_limited():
-    parsed = parse_elements([{"type": "text", "text": "x" * 900}])[0]
-    assert len(parsed.text) == 500
-    many = parse_elements([{"type": "text", "text": "\n".join("abcdefghij" * 5)}])[0]
-    assert len(many.text.split("\n")) <= 20
+    """Catalog paste can be long - the cap exists only against abuse, not to
+    truncate realistic catalog copy (material/dimensions/weight/price)."""
+    parsed = parse_elements([{"type": "text", "text": "x" * (MAX_TEXT_LENGTH + 400)}])[0]
+    assert len(parsed.text) == MAX_TEXT_LENGTH
+    many = parse_elements(
+        [{"type": "text", "text": "\n".join("a" * (MAX_LINES + 30))}]
+    )[0]
+    assert len(many.text.split("\n")) <= MAX_LINES
 
 
 # --- text layout ----------------------------------------------------------

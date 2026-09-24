@@ -23,6 +23,7 @@ export const EXPORT_PRESETS: Record<ExportFormat, { width: number; height: numbe
   'instagram-portrait': { width: 1080, height: 1350 },
   'instagram-square': { width: 1080, height: 1080 },
   'instagram-landscape': { width: 1080, height: 566 },
+  '925x1131': { width: 925, height: 1131 },
 }
 
 export const EXPORT_LABELS: Record<ExportFormat, string> = {
@@ -30,6 +31,7 @@ export const EXPORT_LABELS: Record<ExportFormat, string> = {
   'instagram-portrait': 'Instagram Portrait 4:5',
   'instagram-square': 'Instagram Square 1:1',
   'instagram-landscape': 'Instagram Landscape 1.91:1',
+  '925x1131': '925 × 1131',
 }
 
 export interface Size {

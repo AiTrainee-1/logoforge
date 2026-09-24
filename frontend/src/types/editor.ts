@@ -18,6 +18,7 @@ export type ExportFormat =
   | 'instagram-portrait'
   | 'instagram-square'
   | 'instagram-landscape'
+  | '925x1131'
 
 export type FitMode = 'cover' | 'contain'
 
@@ -198,12 +199,24 @@ export interface OverlayElement {
   text: string
   fontSize: number
   lineHeight: number
+  /** Extra space between characters, in reference-width px. 0 = normal. */
+  letterSpacing: number
   color: string
   bold: boolean
   align: TextAlign
   background: LabelBackground
   backgroundColor: string
   backgroundOpacity: number
+  /**
+   * Text BOX width, percent of frame width. 0 = not a box: the element keeps
+   * the free-floating, never-wraps behaviour every existing text element
+   * (Studio's extra letters, plain composer stamps) already relies on.
+   * A positive value switches the same element to word-wrapped rendering.
+   */
+  boxWidth: number
+  /** Target box height, percent of frame height. 0/too small = auto - the
+   * box always grows to fit its wrapped content; text is never clipped. */
+  boxHeight: number
 
   // image elements
   assetId: string
@@ -219,12 +232,15 @@ export const DEFAULT_ELEMENT: Omit<OverlayElement, 'id'> = {
   text: 'A',
   fontSize: 48,
   lineHeight: 1.2,
+  letterSpacing: 0,
   color: '#FFFFFF',
   bold: true,
   align: 'center',
   background: 'shadow',
   backgroundColor: '#000000',
   backgroundOpacity: 45,
+  boxWidth: 0,
+  boxHeight: 0,
   assetId: '',
   widthPercent: 20,
 }
@@ -249,6 +265,7 @@ export type CardPreset =
   | 'square-2048'
   | 'portrait-1080'
   | 'story-1080'
+  | 'catalog'
   | 'custom'
 
 export interface CanvasSettings {

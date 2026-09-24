@@ -45,6 +45,7 @@ CARD_PRESETS = {
     "square-2048": {"width": 2048, "height": 2048, "label": "Square 2048"},
     "portrait-1080": {"width": 1080, "height": 1350, "label": "Portrait 4:5"},
     "story-1080": {"width": 1080, "height": 1920, "label": "Story 9:16"},
+    "catalog": {"width": 925, "height": 1131, "label": "Catalog card (925x1131)"},
 }
 
 MAX_SIDE = 10000
@@ -113,7 +114,7 @@ def load_assets(job_id: str, elements: list) -> dict:
         if record is None:
             continue
         try:
-            image = open_source(job_store.source_path(job_id, record))
+            image, _reoriented = open_source(job_store.source_path(job_id, record))
             assets[asset_id] = image.convert("RGBA") if image.mode != "RGBA" else image
         except ApiError:
             continue
@@ -161,12 +162,17 @@ def render_composition(job_id: str, payload: dict) -> Composition:
     info = {}
     if mode == "image":
         source_file = job_store.source_path(job_id, base_record)
-        with open_source(source_file) as source:
+        source, reoriented = open_source(source_file)
+        try:
             info = dict(source.info)
             # Trust the pixels over the stored metadata.
             frame_w, frame_h = source.size
 
-            if not elements and image_format == (base_record.get("format") or "").upper():
+            if (
+                not elements
+                and not reoriented
+                and image_format == (base_record.get("format") or "").upper()
+            ):
                 # Nothing to draw: hand back the original file untouched.
                 return Composition(
                     data=source_file.read_bytes(),
@@ -183,6 +189,8 @@ def render_composition(job_id: str, payload: dict) -> Composition:
 
             # The canvas is the photo itself - never resampled, never resized.
             canvas = source.convert("RGBA") if source.mode != "RGBA" else source.copy()
+        finally:
+            source.close()
     else:
         fill = (0, 0, 0, 0) if transparent else background + (255,)
         canvas = Image.new("RGBA", (frame_w, frame_h), fill)

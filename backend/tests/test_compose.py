@@ -68,6 +68,28 @@ def test_image_mode_without_elements_returns_the_original_bytes(client):
     assert fetch(client, job["jobId"]).data == original
 
 
+def test_image_mode_without_elements_still_applies_exif_orientation(client):
+    """A sideways phone photo must not take the byte-identical passthrough -
+    the file on disk is the un-rotated buffer, so the reported and delivered
+    dimensions would disagree with what the browser preview showed."""
+    raw = Image.new("RGB", (40, 20), (200, 40, 40))
+    exif = raw.getexif()
+    exif[0x0112] = 6  # needs a 90 degree turn to display upright
+    buffer = io.BytesIO()
+    raw.save(buffer, format="JPEG", quality=95, exif=exif)
+
+    job = upload(client, [("sideways.jpg", buffer.getvalue())])
+    body = compose(
+        client, job["jobId"], mode="image", baseImageId=job["images"][0]["id"], elements=[]
+    ).get_json()
+
+    assert (body["width"], body["height"]) == (20, 40)
+    assert body["passthrough"] is False
+    data = fetch(client, job["jobId"]).data
+    with Image.open(io.BytesIO(data)) as image:
+        assert image.size == (20, 40)
+
+
 @pytest.mark.parametrize(
     "fmt,extension,mime",
     [("JPEG", ".jpg", "image/jpeg"), ("PNG", ".png", "image/png"), ("WEBP", ".webp", "image/webp")],
@@ -237,6 +259,11 @@ def test_capabilities_expose_the_card_presets(client):
     payload = client.get("/api/capabilities").get_json()
     assert payload["cardPresets"]["a4-150"]["width"] == 1240
     assert payload["cardPresets"]["a4-300"]["height"] == 3508
+    assert payload["cardPresets"]["catalog"] == {
+        "width": 925,
+        "height": 1131,
+        "label": "Catalog card (925x1131)",
+    }
     assert isinstance(payload["fontUrls"], dict)
 
 

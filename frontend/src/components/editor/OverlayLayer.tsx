@@ -16,6 +16,8 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { cn } from '@/lib/utils'
 import type { CanvasAsset, OverlayElement } from '@/types/editor'
 import {
+  BOX_WIDTH_MAX,
+  BOX_WIDTH_MIN,
   ELEMENT_WIDTH_MAX,
   ELEMENT_WIDTH_MIN,
   FONT_SIZE_MAX,
@@ -178,8 +180,22 @@ function ElementView({
       return
     }
 
-    // Any corner scales the element about its centre, which keeps working
-    // however far it has been rotated.
+    if (element.type === 'text' && element.boxWidth > 0) {
+      // A text box resizes like a rectangle, not a uniform scale: dragging a
+      // corner sets the box's half-width to the pointer's distance from the
+      // (fixed) centre. Height is never dragged here - it always follows
+      // from how the wider/narrower box rewraps the text.
+      const widthPx = Math.abs(point.x - origin.x) * 2
+      onChange?.(
+        element.id,
+        { boxWidth: clamp((widthPx / frame.width) * 100, BOX_WIDTH_MIN, BOX_WIDTH_MAX) },
+        false,
+      )
+      return
+    }
+
+    // Any other corner scales the element about its centre, which keeps
+    // working however far it has been rotated.
     const distance = Math.hypot(point.x - origin.x, point.y - origin.y)
     const ratio = distance / start.current.distance
     if (element.type === 'image') {

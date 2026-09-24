@@ -96,8 +96,14 @@ class RenderResult:
     notes: list
 
 
-def open_source(path: Path) -> Image.Image:
-    """Open an image and apply its EXIF orientation once, up front."""
+def open_source(path: Path) -> tuple[Image.Image, bool]:
+    """Open an image and apply its EXIF orientation once, up front.
+
+    Returns ``(image, reoriented)``. When ``reoriented`` is True, EXIF
+    orientation physically transposed the pixels, so the file's own bytes on
+    disk are the *un-rotated* buffer and can no longer stand in for the
+    rendered result - the identity passthrough below must not use them.
+    """
     try:
         img = Image.open(path)
         img.load()
@@ -105,14 +111,23 @@ def open_source(path: Path) -> Image.Image:
         raise ApiError(
             "IMAGE_PROCESSING_FAILED", "Unable to read this image.", 422
         ) from exc
+    reoriented = False
     try:
+        # ImageOps.exif_transpose() always hands back a *new* object - even a
+        # plain .copy() when there is nothing to do - so object identity can't
+        # tell us whether a real transpose happened. The orientation tag can:
+        # exif_transpose is a no-op for exactly 1 (or an absent/invalid tag).
+        orientation = img.getexif().get(0x0112, 1)
         oriented = ImageOps.exif_transpose(img)
-        if oriented is not img:
+        if orientation != 1:
             img.close()
             img = oriented
+            reoriented = True
+        else:
+            oriented.close()
     except Exception:  # pragma: no cover - broken EXIF is not fatal
         pass
-    return img
+    return img, reoriented
 
 
 def target_format(source_format: str, export: ExportSettings) -> str:
@@ -257,7 +272,8 @@ def render(source_path: Path, spec: RenderSpec, source_meta: dict) -> RenderResu
             % (source_format, out_format)
         )
 
-    with open_source(source_path) as source:
+    source, reoriented = open_source(source_path)
+    try:
         src_w, src_h = source.size
         frame_w, frame_h = compute_frame(src_w, src_h, spec.export)
         placement = compute_placement(
@@ -270,9 +286,12 @@ def render(source_path: Path, spec: RenderSpec, source_meta: dict) -> RenderResu
         draws_label = bool(spec.label.enabled and spec.label_text)
         draws_overlays = bool(spec.overlays)
 
-        # True no-op: hand back the original bytes, bit for bit.
+        # True no-op: hand back the original bytes, bit for bit. Not eligible
+        # when EXIF orientation transposed the pixels - the file on disk is
+        # the un-rotated buffer, so it can no longer stand in for the result.
         if (
             identity
+            and not reoriented
             and not draws_logo
             and not draws_label
             and not draws_overlays
@@ -308,6 +327,8 @@ def render(source_path: Path, spec: RenderSpec, source_meta: dict) -> RenderResu
         canvas = draw_source(canvas, rgba_source, placement)
         if rgba_source is not source:
             rgba_source.close()
+    finally:
+        source.close()
 
     resampled = abs(placement.scale - 1.0) > 1e-9
 

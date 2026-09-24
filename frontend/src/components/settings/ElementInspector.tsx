@@ -19,6 +19,9 @@ import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import type { LabelBackground, OverlayElement, TextAlign } from '@/types/editor'
 import {
+  BOX_HEIGHT_MAX,
+  BOX_WIDTH_MAX,
+  BOX_WIDTH_MIN,
   ELEMENT_WIDTH_MAX,
   ELEMENT_WIDTH_MIN,
   FONT_SIZE_MAX,
@@ -73,6 +76,7 @@ export function ElementInspector({
   onCommit: () => void
 }) {
   const isText = element.type === 'text'
+  const isBox = isText && element.boxWidth > 0
 
   return (
     <div className="space-y-4">
@@ -81,15 +85,52 @@ export function ElementInspector({
           <Label className="text-muted-foreground">Text</Label>
           <textarea
             value={element.text}
-            rows={2}
+            rows={isBox ? 8 : 2}
             spellCheck={false}
             onChange={(event) => onChange({ text: event.target.value })}
             className="w-full resize-y rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-            placeholder="Type a letter or a line of text"
+            placeholder="Type a letter, or paste your catalog text"
           />
           <p className="text-[11px] text-muted-foreground">
-            Press Enter for a second line. Up to 20 lines.
+            {isBox
+              ? 'Pasted text is never rearranged - only wrapped to the box width. Edit freely.'
+              : 'Press Enter for a second line. Up to 20 lines.'}
           </p>
+        </div>
+      ) : null}
+
+      {isBox ? (
+        <div className="grid grid-cols-2 gap-3">
+          <FieldRow
+            label="Box width"
+            value={`${element.boxWidth.toFixed(1)}%`}
+            hint="Percent of the canvas width - text rewraps as this changes."
+          >
+            <Slider
+              value={[element.boxWidth]}
+              min={BOX_WIDTH_MIN}
+              max={BOX_WIDTH_MAX}
+              step={0.5}
+              onValueChange={([value]) => onChange({ boxWidth: value }, false)}
+              onValueCommit={onCommit}
+              aria-label="Text box width"
+            />
+          </FieldRow>
+          <FieldRow
+            label="Min height"
+            value={element.boxHeight > 0 ? `${element.boxHeight.toFixed(1)}%` : 'Auto'}
+            hint="A target only - the box always grows to fit its text."
+          >
+            <Slider
+              value={[element.boxHeight]}
+              min={0}
+              max={BOX_HEIGHT_MAX}
+              step={0.5}
+              onValueChange={([value]) => onChange({ boxHeight: value }, false)}
+              onValueCommit={onCommit}
+              aria-label="Text box minimum height"
+            />
+          </FieldRow>
         </div>
       ) : null}
 
@@ -152,6 +193,33 @@ export function ElementInspector({
               </Button>
             ))}
           </div>
+        </div>
+      ) : null}
+
+      {isText ? (
+        <div className="grid grid-cols-2 gap-3">
+          <FieldRow label="Line height" value={element.lineHeight.toFixed(2)}>
+            <Slider
+              value={[element.lineHeight]}
+              min={0.6}
+              max={3}
+              step={0.05}
+              onValueChange={([value]) => onChange({ lineHeight: value }, false)}
+              onValueCommit={onCommit}
+              aria-label="Line height"
+            />
+          </FieldRow>
+          <FieldRow label="Letter spacing" value={`${element.letterSpacing.toFixed(1)}px`}>
+            <Slider
+              value={[element.letterSpacing]}
+              min={-5}
+              max={40}
+              step={0.5}
+              onValueChange={([value]) => onChange({ letterSpacing: value }, false)}
+              onValueCommit={onCommit}
+              aria-label="Letter spacing"
+            />
+          </FieldRow>
         </div>
       ) : null}
 

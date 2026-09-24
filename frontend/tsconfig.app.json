@@ -28,5 +28,9 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // *.test.ts files run under Node (node --test), not the browser, and are
+  // never bundled into the app - they don't belong to this browser-typed
+  // project (no "node" types here) or to the production build.
+  "exclude": ["src/**/*.test.ts"]
 }

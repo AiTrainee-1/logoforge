@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  FileText,
   Images,
   Lock,
   Moon,
@@ -42,9 +43,11 @@ const STEPS = ['Upload', 'Edit', 'Preview', 'Download']
 export function Landing({
   onStart,
   onOpenComposer,
+  onOpenCatalog,
 }: {
   onStart: () => void
   onOpenComposer: () => void
+  onOpenCatalog: () => void
 }) {
   const { theme, toggle } = useTheme()
 
@@ -55,6 +58,9 @@ export function Landing({
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon-sm" onClick={toggle} aria-label="Toggle theme">
             {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onOpenCatalog}>
+            Catalog slide
           </Button>
           <Button variant="ghost" size="sm" onClick={onOpenComposer}>
             Image editor
@@ -85,6 +91,10 @@ export function Landing({
             </Button>
             <Button size="lg" variant="outline" onClick={onOpenComposer}>
               Open the image editor
+            </Button>
+            <Button size="lg" variant="outline" onClick={onOpenCatalog}>
+              <FileText className="size-4" />
+              Catalog slide
             </Button>
             <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
               {STEPS.map((step, index) => (

@@ -133,6 +133,26 @@ def test_instagram_exports(tmp_path, preset, expected):
         assert image.size == expected
 
 
+@pytest.mark.parametrize("src_w,src_h", [(4000, 3000), (500, 900), (925, 1131)])
+def test_925x1131_export_is_always_exactly_that_size(tmp_path, src_w, src_h):
+    """Fixed preset: output must be 925x1131 regardless of the source size."""
+    path = write(tmp_path, "src.jpg", make_image(src_w, src_h))
+    result = render(
+        path,
+        spec(
+            logo=LogoSettings.from_payload({"position": "bottom-right", "sizePercent": 12}),
+            logo_image=Image.open(io.BytesIO(make_logo())).convert("RGBA"),
+            label=LabelSettings(enabled=True),
+            label_text="A",
+            export=ExportSettings.from_payload({"format": "925x1131"}),
+        ),
+        meta("JPEG"),
+    )
+    assert (result.width, result.height) == (925, 1131)
+    with open_result(result) as image:
+        assert image.size == (925, 1131)
+
+
 # --- logo placement -------------------------------------------------------
 
 def logo_image():

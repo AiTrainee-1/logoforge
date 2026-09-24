@@ -24,8 +24,8 @@ from utils.fonts import load_font
 ALIGNMENTS = ("left", "center", "right")
 BACKGROUNDS = ("none", "shadow", "pill")
 
-MAX_TEXT_LENGTH = 500
-MAX_LINES = 20
+MAX_TEXT_LENGTH = 4000
+MAX_LINES = 80
 
 
 def parse_hex(value, fallback=(255, 255, 255)):
@@ -60,6 +60,7 @@ class TextStyle:
     background: str = "shadow"
     background_color: str = "#000000"
     background_opacity: float = 45.0
+    letter_spacing: float = 0.0
 
     @classmethod
     def from_payload(cls, data) -> "TextStyle":
@@ -75,6 +76,7 @@ class TextStyle:
             background=background if background in BACKGROUNDS else "shadow",
             background_color=normalise_hex(data.get("backgroundColor"), "#000000"),
             background_opacity=clamp(as_float(data.get("backgroundOpacity"), 45.0), 0.0, 100.0),
+            letter_spacing=clamp(as_float(data.get("letterSpacing"), 0.0), -20.0, 200.0),
         )
 
 
@@ -85,6 +87,67 @@ def clean_text(value) -> str:
     text = value.replace("\r\n", "\n").replace("\r", "\n")[:MAX_TEXT_LENGTH]
     lines = text.split("\n")[:MAX_LINES]
     return "\n".join(lines)
+
+
+def _line_width(draw, line: str, font, letter_spacing_px: float = 0.0) -> float:
+    """Line width including letter-spacing gaps (one gap between each pair)."""
+    if not line:
+        return 0.0
+    width = draw.textlength(line, font=font)
+    if letter_spacing_px and len(line) > 1:
+        width += letter_spacing_px * (len(line) - 1)
+    return width
+
+
+def _draw_line(draw, x, baseline, line, font, fill, anchor, letter_spacing_px, stroke_width, stroke_fill):
+    """Draw one line. Falls back to glyph-by-glyph placement only when
+    letter-spacing is actually requested, so the common case (0 spacing)
+    keeps using Pillow's own single-call text layout unchanged."""
+    if not letter_spacing_px or len(line) <= 1:
+        draw.text(
+            (x, baseline), line, font=font, fill=fill, anchor=anchor,
+            stroke_width=stroke_width, stroke_fill=stroke_fill,
+        )
+        return
+    total = _line_width(draw, line, font, letter_spacing_px)
+    if anchor.startswith("m"):
+        cursor = x - total / 2.0
+    elif anchor.startswith("r"):
+        cursor = x - total
+    else:
+        cursor = x
+    for char in line:
+        draw.text(
+            (cursor, baseline), char, font=font, fill=fill, anchor="ls",
+            stroke_width=stroke_width, stroke_fill=stroke_fill,
+        )
+        cursor += draw.textlength(char, font=font) + letter_spacing_px
+
+
+def wrap_lines(draw, text: str, font, max_width_px: float, letter_spacing_px: float = 0.0) -> list:
+    """Greedy word-wrap to ``max_width_px``. Explicit newlines stay paragraph
+    breaks - pasted catalog text is never silently rearranged, only wrapped.
+
+    A single word wider than the box is kept whole on its own line rather
+    than being cut mid-word: content is never dropped, only overflowed.
+    """
+    if max_width_px <= 0:
+        return text.split("\n") if text else [""]
+    wrapped = []
+    for paragraph in text.split("\n"):
+        if paragraph == "":
+            wrapped.append("")
+            continue
+        line = ""
+        for word in paragraph.split(" "):
+            candidate = word if not line else line + " " + word
+            if not line or _line_width(draw, candidate, font, letter_spacing_px) <= max_width_px:
+                line = candidate
+            else:
+                wrapped.append(line)
+                line = word
+        wrapped.append(line)
+    return wrapped or [""]
 
 
 def text_metrics(frame_w: int, style: TextStyle) -> dict:
@@ -123,9 +186,10 @@ def render_text_block(text: str, frame_w: int, style: TextStyle, opacity: float 
 
     font = load_font(font_px, style.bold)
     lines = text.split("\n") if text else [""]
+    letter_px = scaled_px(style.letter_spacing, frame_w)
 
     probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    widths = [probe.textlength(line, font=font) for line in lines]
+    widths = [_line_width(probe, line, font, letter_px) for line in lines]
     text_w = max(widths) if widths else 0
     # The stroke grows the ink on both sides of every glyph.
     content_w = int(round(text_w)) + stroke * 2
@@ -159,15 +223,7 @@ def render_text_block(text: str, frame_w: int, style: TextStyle, opacity: float 
 
     for index, line in enumerate(lines):
         baseline = pad_y + index * line_h + half_leading + ascent
-        draw.text(
-            (origin_x, baseline),
-            line,
-            font=font,
-            fill=fill,
-            anchor=anchor,
-            stroke_width=stroke,
-            stroke_fill=stroke_fill,
-        )
+        _draw_line(draw, origin_x, baseline, line, font, fill, anchor, letter_px, stroke, stroke_fill)
 
     if opacity < 100.0:
         alpha = tile.getchannel("A").point(
@@ -177,4 +233,78 @@ def render_text_block(text: str, frame_w: int, style: TextStyle, opacity: float 
 
     geometry = dict(metrics)
     geometry.update({"width": tile_w, "height": tile_h, "lines": len(lines)})
+    return tile, geometry
+
+
+def render_text_box(
+    text: str,
+    frame_w: int,
+    style: TextStyle,
+    box_width_px: float,
+    box_height_px: float = 0.0,
+    opacity: float = 100.0,
+):
+    """Render ``text`` word-wrapped to a fixed-width box (the catalog text box).
+
+    Unlike ``render_text_block`` (which auto-sizes its tile to whatever the
+    text needs, never wrapping except on explicit newlines), this wraps to
+    ``box_width_px`` and returns ``(tile, geometry)`` sized to fit. Text is
+    never clipped: ``box_height_px`` is a *target* height, and the tile grows
+    taller than it whenever the wrapped content genuinely needs more room.
+    """
+    text = clean_text(text)
+    metrics = text_metrics(frame_w, style)
+    font_px = metrics["fontPx"]
+    stroke = metrics["strokePx"]
+    pad_x = metrics["padX"]
+    pad_y = metrics["padY"]
+    line_h = metrics["lineHeightPx"]
+    letter_px = scaled_px(style.letter_spacing, frame_w)
+
+    font = load_font(font_px, style.bold)
+    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    inner_width = max(1.0, box_width_px - pad_x * 2)
+    lines = wrap_lines(probe, text, font, inner_width, letter_px)
+
+    content_h = line_h * len(lines)
+    tile_w = max(1, int(round(box_width_px)))
+    tile_h = max(1, int(round(max(box_height_px, content_h + pad_y * 2))))
+    tile = Image.new("RGBA", (tile_w, tile_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(tile)
+
+    if style.background == "pill":
+        radius = min(tile_w, tile_h) / 2.0
+        draw.rounded_rectangle(
+            (0, 0, tile_w - 1, tile_h - 1),
+            radius=radius,
+            fill=parse_hex(style.background_color, (0, 0, 0))
+            + (int(round(255 * style.background_opacity / 100.0)),),
+        )
+
+    ascent, descent = font.getmetrics()
+    half_leading = (line_h - (ascent + descent)) / 2.0
+    fill = parse_hex(style.color, (255, 255, 255)) + (255,)
+    stroke_fill = parse_hex(style.background_color, (0, 0, 0)) + (140,) if stroke else None
+
+    if style.align == "left":
+        anchor, origin_x = "ls", pad_x + stroke
+    elif style.align == "right":
+        anchor, origin_x = "rs", tile_w - pad_x - stroke
+    else:
+        anchor, origin_x = "ms", tile_w / 2.0
+
+    for index, line in enumerate(lines):
+        baseline = pad_y + index * line_h + half_leading + ascent
+        _draw_line(draw, origin_x, baseline, line, font, fill, anchor, letter_px, stroke, stroke_fill)
+
+    if opacity < 100.0:
+        alpha = tile.getchannel("A").point(
+            lambda value, factor=max(0.0, opacity) / 100.0: int(round(value * factor))
+        )
+        tile.putalpha(alpha)
+
+    geometry = dict(metrics)
+    geometry.update(
+        {"width": tile_w, "height": tile_h, "lines": len(lines), "letterSpacingPx": letter_px}
+    )
     return tile, geometry

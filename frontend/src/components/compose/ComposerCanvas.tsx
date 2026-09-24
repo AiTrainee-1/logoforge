@@ -8,6 +8,7 @@
 import { ImagePlus } from 'lucide-react'
 import { useLayoutEffect, useState } from 'react'
 
+import { CatalogSetup } from '@/components/compose/CatalogSetup'
 import { OverlayLayer } from '@/components/editor/OverlayLayer'
 import type { UseCompose } from '@/hooks/useCompose'
 import { cn } from '@/lib/utils'
@@ -37,6 +38,7 @@ export function ComposerCanvas({
 
   const { canvas, frame, baseImage, elements, assetMap } = compose
   const empty = canvas.mode === 'image' && !baseImage
+  const catalogSetup = canvas.mode === 'card' && canvas.preset === 'catalog' && elements.length === 0
 
   const available = {
     width: Math.max(80, box.width - PADDING),
@@ -55,7 +57,9 @@ export function ComposerCanvas({
         className,
       )}
     >
-      {empty ? (
+      {catalogSetup ? (
+        <CatalogSetup compose={compose} />
+      ) : empty ? (
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
           <ImagePlus className="size-8 opacity-60" />
           <p className="text-sm">Upload an image to start</p>

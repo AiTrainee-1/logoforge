@@ -16,6 +16,7 @@ const FORMATS: { value: ExportFormat; hint: string }[] = [
   { value: 'instagram-portrait', hint: '1080 × 1350' },
   { value: 'instagram-square', hint: '1080 × 1080' },
   { value: 'instagram-landscape', hint: '1080 × 566' },
+  { value: '925x1131', hint: '925 × 1131' },
 ]
 
 export function ExportPanel() {

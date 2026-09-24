@@ -18,6 +18,7 @@ import type {
   OverlayElement,
 } from '@/types/editor'
 import { DEFAULT_CANVAS } from '@/types/editor'
+import { type CatalogMargins, computeCatalogLayout } from '@/utils/catalogLayout'
 import { clampElement, createElement, elementsPayload, ELEMENT_LIMIT } from '@/utils/overlays'
 import { clamp, type Size } from '@/utils/transforms'
 
@@ -28,6 +29,7 @@ export const CARD_PRESETS: Record<Exclude<CardPreset, 'custom'>, Size & { label:
   'square-2048': { width: 2048, height: 2048, label: 'Square · 2048' },
   'portrait-1080': { width: 1080, height: 1350, label: 'Portrait 4:5' },
   'story-1080': { width: 1080, height: 1920, label: 'Story 9:16' },
+  catalog: { width: 925, height: 1131, label: 'Catalog card' },
 }
 
 const HISTORY_LIMIT = 60
@@ -56,6 +58,15 @@ export interface UseCompose {
   setMode: (mode: CanvasSettings['mode']) => void
   addText: (overrides?: Partial<OverlayElement>) => void
   addImageElement: (assetId: string) => void
+  /** Uploads the product photo as a plain asset - no element yet. */
+  uploadCatalogImage: (file: File) => Promise<CanvasAsset | null>
+  /** Auto-layout: switches to the catalog card and creates the text box +
+   * image element in one step (one undo entry for the whole slide). */
+  createCatalogSlide: (
+    text: string,
+    assetId: string,
+    margins?: CatalogMargins,
+  ) => { fontSizeReduced: boolean } | null
   select: (id: string | null) => void
   update: (id: string, patch: Partial<OverlayElement>, commit?: boolean) => void
   remove: (id: string) => void
@@ -238,6 +249,42 @@ export function useCompose(onError: (message: string) => void): UseCompose {
       setSelectedId(element.id)
     },
     [fitWidthPercent, frame, mutate, upload],
+  )
+
+  const uploadCatalogImage = useCallback(
+    (file: File) => upload(file),
+    [upload],
+  )
+
+  const createCatalogSlide = useCallback(
+    (text: string, assetId: string, margins?: CatalogMargins) => {
+      const asset = assets.find((item) => item.id === assetId)
+      const target = CARD_PRESETS.catalog
+      const layout = computeCatalogLayout({ frame: target, text, asset, margins })
+
+      // One element per recognised section (title/description/details/price)
+      // - each is an ordinary text-box element, independently selectable,
+      // draggable, resizable and stylable through the existing Inspector.
+      const textElements = layout.sections.map((section) =>
+        createElement({ type: 'text', text: section.text, ...section.element }),
+      )
+      const imageElement = layout.image
+        ? createElement({ type: 'image', assetId, ...layout.image })
+        : null
+
+      setCanvasState((current) => ({
+        ...current,
+        mode: 'card',
+        preset: 'catalog',
+        width: target.width,
+        height: target.height,
+      }))
+      mutate((current) => [...current, ...textElements, ...(imageElement ? [imageElement] : [])])
+      // Select the title (first section) so its controls show right away.
+      setSelectedId(textElements[0]?.id ?? imageElement?.id ?? null)
+      return { fontSizeReduced: layout.fontSizeReduced }
+    },
+    [assets, mutate],
   )
 
   const removeAsset = useCallback(
@@ -483,6 +530,8 @@ export function useCompose(onError: (message: string) => void): UseCompose {
     setMode,
     addText,
     addImageElement,
+    uploadCatalogImage,
+    createCatalogSlide,
     select: setSelectedId,
     update,
     remove,

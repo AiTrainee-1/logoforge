@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from PIL import Image
 
 from services.logo_processor import paste_rgba
-from services.text_service import TextStyle, clean_text, render_text_block
+from services.text_service import TextStyle, clean_text, render_text_block, render_text_box
 from services.transform_service import as_float, clamp
 
 ELEMENT_TYPES = ("text", "image")
@@ -36,6 +36,13 @@ class OverlayElement:
     # text elements
     text: str = ""
     style: TextStyle = field(default_factory=TextStyle)
+    # A text box (catalog text): explicit width, word-wrapped. 0 means "not a
+    # box" - the element keeps the free-floating, auto-sized behaviour every
+    # existing caller (Studio's extra letters, composer stamps) already relies
+    # on. box_height is a target only; the tile grows taller when the wrapped
+    # content needs more room, so text is never clipped.
+    box_width: float = 0.0
+    box_height: float = 0.0
 
     # image elements
     asset_id: str = ""
@@ -56,6 +63,8 @@ class OverlayElement:
             opacity=clamp(as_float(data.get("opacity"), 100.0), 0.0, 100.0),
             text=clean_text(data.get("text")),
             style=TextStyle.from_payload(data),
+            box_width=clamp(as_float(data.get("boxWidth"), 0.0), 0.0, 200.0),
+            box_height=clamp(as_float(data.get("boxHeight"), 0.0), 0.0, 400.0),
             asset_id=str(data.get("assetId") or "")[:64],
             width_percent=clamp(as_float(data.get("widthPercent"), 20.0), 0.5, 400.0),
         )
@@ -97,7 +106,14 @@ def render_element(frame: Image.Image, element: OverlayElement, assets: dict) ->
     if element.type == "text":
         if not element.text:
             return frame
-        tile, _ = render_text_block(element.text, frame_w, element.style, element.opacity)
+        if element.box_width > 0:
+            box_width_px = (element.box_width / 100.0) * frame_w
+            box_height_px = (element.box_height / 100.0) * frame_h
+            tile, _ = render_text_box(
+                element.text, frame_w, element.style, box_width_px, box_height_px, element.opacity
+            )
+        else:
+            tile, _ = render_text_block(element.text, frame_w, element.style, element.opacity)
     else:
         asset = assets.get(element.asset_id)
         if asset is None:

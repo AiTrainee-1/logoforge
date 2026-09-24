@@ -37,11 +37,25 @@ const FALLBACK_STACK =
 export interface FontSync {
   family: string | null
   serverFont: string | null
+  /** Human-friendly name of the typeface actually used ("Arial", "DejaVu
+   * Sans", …) - the one and only font the whole app (Studio, Composer,
+   * Catalog Composer) renders with, so preview and export always match. */
+  displayName: string | null
+}
+
+function prettify(stem: string): string {
+  return stem
+    .replace(/[-_]/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
 }
 
 export function useFontSync(): FontSync {
   const [family, setFamily] = useState<string | null>(null)
   const [serverFont, setServerFont] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -54,6 +68,7 @@ export function useFontSync(): FontSync {
 
         // Even without a bundled file, ask for the same typeface by name.
         const equivalent = CSS_EQUIVALENT[(capabilities.labelFont ?? '').toLowerCase()]
+        setDisplayName(equivalent ?? (capabilities.labelFont ? prettify(capabilities.labelFont) : null))
         if (equivalent) {
           document.documentElement.style.setProperty(
             '--font-label',
@@ -97,5 +112,5 @@ export function useFontSync(): FontSync {
     }
   }, [])
 
-  return { family, serverFont }
+  return { family, serverFont, displayName }
 }

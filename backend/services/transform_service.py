@@ -35,6 +35,7 @@ EXPORT_PRESETS = {
     "instagram-portrait": (1080, 1350),
     "instagram-square": (1080, 1080),
     "instagram-landscape": (1080, 566),
+    "925x1131": (925, 1131),
 }
 
 
