@@ -23,7 +23,7 @@
  * same layout numbers describe a small preview and the 925x1131 export.
  */
 import type { CanvasAsset, OverlayElement, TextAlign } from '@/types/editor'
-import { type CatalogSections, parseCatalogText, withDetailMarkers } from '@/utils/catalogParser'
+import { type CatalogSections, parseCatalogText } from '@/utils/catalogParser'
 import { createElement, textBoxHeight } from '@/utils/overlays'
 import { scaledPx, type Size } from '@/utils/transforms'
 
@@ -46,12 +46,18 @@ export interface CatalogSectionStyle {
 
 /** Warm off-white - the Catalog Composer's default background (never pure
  * white). Applied when a catalog slide is created; adjustable afterwards
- * from the Canvas panel like any other card background. */
+ * from the Canvas panel like any other card background.
+ * Measured directly from the supplied reference screenshot (pixel-sampled,
+ * not eyeballed): flat background fill at (20,20) etc. = RGB(237,235,236). */
 export const CATALOG_BACKGROUND = '#EDEBEC'
-/** Editorial brown for the title, in the same family as the reference. */
-export const CATALOG_TITLE_COLOR = '#825542'
-/** Dark, warm charcoal (not pure black) for body copy. */
-export const CATALOG_BODY_COLOR = '#2B2B2B'
+/** Editorial brown for the title. Measured from the reference screenshot:
+ * averaged the least-anti-aliased (most saturated) title-glyph pixels,
+ * RGB(122,78,59). */
+export const CATALOG_TITLE_COLOR = '#7A4E3B'
+/** Body/details/price ink. Measured from the reference screenshot: the
+ * darkest sampled glyph pixels are flat RGB(0,0,0) - true black, not a
+ * softened charcoal. */
+export const CATALOG_BODY_COLOR = '#000000'
 
 /**
  * Default styling per section. All four render with the Catalog Composer's
@@ -131,10 +137,11 @@ export interface CatalogLayoutInput {
   margins?: CatalogMargins
   /** Per-section style overrides, merged onto `CATALOG_SECTION_DEFAULTS`. */
   styles?: Partial<Record<CatalogSectionKey, Partial<CatalogSectionStyle>>>
-  /** Off by default. When true, each recognised Details label line gets a
-   * subtle marker prefix (see `withDetailMarkers`). Title/description/price
-   * are never affected. */
-  detailMarkers?: boolean
+  /** Off by default. When true, the Details and Price sections prefix each
+   * recognised field line ("Material:", "Dimensions:", "Weight:", "Price:")
+   * with a small icon, tinted to that section's own text colour. Title and
+   * description are never affected. */
+  showIcons?: boolean
 }
 
 export interface CatalogSectionResult {
@@ -175,9 +182,6 @@ export function computeCatalogLayout(input: CatalogLayoutInput): CatalogLayoutRe
   const { frame, asset } = input
   const margins = input.margins ?? CATALOG_DEFAULT_MARGINS
   const sections: CatalogSections = parseCatalogText(input.text)
-  if (input.detailMarkers) {
-    sections.details = withDetailMarkers(sections.details)
-  }
 
   const marginTopPx = scaledPx(margins.top, frame.width)
   const marginLeftPx = scaledPx(margins.left, frame.width)
@@ -247,6 +251,7 @@ export function computeCatalogLayout(input: CatalogLayoutInput): CatalogLayoutRe
         lineHeight: base.lineHeight,
         background: 'none',
         fontFamily: base.fontFamily,
+        showIcons: Boolean(input.showIcons) && (key === 'details' || key === 'price'),
       },
     })
     cursorY += height + sectionGapPx

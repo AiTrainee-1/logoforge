@@ -4,61 +4,79 @@
 
 /* --------------------------------------------------------------------------
    Design tokens. Light is the default; .dark on <html> flips them.
+
+   The light palette is the app's "Tamarind Taless" identity: warm cream
+   surfaces, near-black warm ink, a deep brown accent and a WhatsApp-green
+   primary action colour - values pixel-sampled from a reference storefront,
+   not approximated. Plain hex is used (not oklch, like the rest of this
+   file) specifically so those sampled values stay exact; color-mix() and
+   every other consumer below works identically regardless of which
+   notation a custom property holds.
    -------------------------------------------------------------------------- */
 :root {
-  --background: oklch(0.985 0.002 260);
-  --foreground: oklch(0.21 0.02 265);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.02 265);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.02 265);
-  --primary: oklch(0.54 0.21 277);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.005 265);
-  --secondary-foreground: oklch(0.29 0.02 265);
-  --muted: oklch(0.965 0.004 265);
-  --muted-foreground: oklch(0.55 0.015 265);
-  --accent: oklch(0.95 0.02 277);
-  --accent-foreground: oklch(0.35 0.08 277);
-  --destructive: oklch(0.58 0.21 27);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.6 0.14 158);
-  --border: oklch(0.92 0.005 265);
-  --input: oklch(0.92 0.005 265);
-  --ring: oklch(0.54 0.21 277);
-  --canvas: oklch(0.94 0.004 265);
+  --background: #e9e4d5;
+  --foreground: #1e1b14;
+  --card: #f7f5ee;
+  --card-foreground: #1e1b14;
+  --popover: #f7f5ee;
+  --popover-foreground: #1e1b14;
+  --primary: #25d366;
+  --primary-foreground: #14291c;
+  --secondary: #ddd6c3;
+  --secondary-foreground: #1e1b14;
+  --muted: #e3ddcb;
+  --muted-foreground: #6a6350;
+  /* A light, subtle tint - this is the default hover background for
+     outline/ghost buttons app-wide, so it stays gentle; the bold brand
+     brown (#4f2318) is reserved for --ring and deliberate accents like the
+     logo mark, not for frequent hover states. */
+  --accent: #eadfc8;
+  --accent-foreground: #4f2318;
+  --destructive: #b23a2e;
+  --destructive-foreground: #f7f5ee;
+  --success: #2fa86b;
+  --border: #d9d2bd;
+  --input: #d9d2bd;
+  --ring: #4f2318;
+  --canvas: #dad4c3;
   --radius: 0.75rem;
   /* Replaced at runtime when the server bundles its own label font, which
      makes the preview text pixel-identical to the export. */
   --font-label: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
     Arial, sans-serif;
-  /* Catalog Composer only - the editorial serif face. Same runtime swap. */
+  /* The app's editorial serif - headings, the brand wordmark and the
+     Catalog Composer's own text (title/description/details/price). Same
+     runtime font-loading swap as --font-label once the server's bundled
+     face (Crimson Text) loads, so the preview matches the export exactly. */
   --font-catalog: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia,
     'Times New Roman', serif;
 }
 
 .dark {
-  --background: oklch(0.17 0.012 265);
-  --foreground: oklch(0.96 0.003 265);
-  --card: oklch(0.21 0.014 265);
-  --card-foreground: oklch(0.96 0.003 265);
-  --popover: oklch(0.21 0.014 265);
-  --popover-foreground: oklch(0.96 0.003 265);
-  --primary: oklch(0.68 0.17 277);
-  --primary-foreground: oklch(0.16 0.02 277);
-  --secondary: oklch(0.27 0.016 265);
-  --secondary-foreground: oklch(0.95 0.003 265);
-  --muted: oklch(0.26 0.014 265);
-  --muted-foreground: oklch(0.68 0.015 265);
-  --accent: oklch(0.31 0.045 277);
-  --accent-foreground: oklch(0.92 0.03 277);
-  --destructive: oklch(0.63 0.2 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.68 0.14 158);
-  --border: oklch(0.29 0.014 265);
-  --input: oklch(0.31 0.014 265);
-  --ring: oklch(0.68 0.17 277);
-  --canvas: oklch(0.13 0.01 265);
+  --background: #1c1712;
+  --foreground: #ede7d8;
+  --card: #241e17;
+  --card-foreground: #ede7d8;
+  --popover: #241e17;
+  --popover-foreground: #ede7d8;
+  --primary: #25d366;
+  --primary-foreground: #0e1510;
+  --secondary: #332a1f;
+  --secondary-foreground: #ede7d8;
+  --muted: #2e271d;
+  --muted-foreground: #b3a890;
+  /* A subtle, slightly-lighter-than-background highlight - same reasoning
+     as the light theme's --accent: this is the default hover state for
+     outline/ghost buttons app-wide, so it stays gentle. */
+  --accent: #352b1f;
+  --accent-foreground: #e8c9ab;
+  --destructive: #d9594a;
+  --destructive-foreground: #1c1712;
+  --success: #3fbf82;
+  --border: #3a3023;
+  --input: #3a3023;
+  --ring: #c98a6b;
+  --canvas: #221c15;
 }
 
 @theme inline {
@@ -117,6 +135,15 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Headings use the editorial serif everywhere - the brand wordmark,
+     section titles, the Catalog Composer's own text. Nav/UI chrome (body
+     copy, buttons, labels) stays on the sans face. */
+  h1, h2, h3 {
+    font-family: var(--font-catalog);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
   ::selection {
     background-color: color-mix(in oklch, var(--color-primary) 28%, transparent);
   }
@@ -141,6 +168,17 @@
 
   .animate-fade-in {
     animation: fade-in 160ms ease-out both;
+  }
+
+  /* Small-caps-style nav/eyebrow treatment: uppercase + tracked, matching
+     the reference storefront's "HOME / SHOP ALL / BY COLLECTION" nav. */
+  .text-tracked {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .font-brand {
+    font-family: var(--font-catalog);
   }
 }
 

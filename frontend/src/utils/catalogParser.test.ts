@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { parseCatalogText, withDetailMarkers } from './catalogParser.ts'
+import { iconForLine, parseCatalogText } from './catalogParser.ts'
 
 const FULL_CATALOG_TEXT = `Terracotta Votive figure | Aiyanar Tradition
 
@@ -170,25 +170,23 @@ test('exact user text survives, including quotes and multiple detail lines', () 
   }
 })
 
-// --- optional detail markers (off by default) --------------------------------
+// --- detail icons (off by default) --------------------------------------------
 
-test('withDetailMarkers prefixes only recognised label lines', () => {
-  const details = 'Material: Terracotta\n\nDimensions:\nC: 12" x 5.5" x 4"\nWeight: 1.175 kg'
-  const marked = withDetailMarkers(details)
-  assert.equal(
-    marked,
-    '– Material: Terracotta\n\n– Dimensions:\nC: 12" x 5.5" x 4"\n– Weight: 1.175 kg',
-  )
+test('iconForLine maps known labels to their icon', () => {
+  assert.equal(iconForLine('Material: Terracotta'), 'material')
+  assert.equal(iconForLine('Materials: Wood'), 'material')
+  assert.equal(iconForLine('Medium: Oil on canvas'), 'material')
+  assert.equal(iconForLine('Dimensions: 23.5"H'), 'dimensions')
+  assert.equal(iconForLine('Dimension: 23.5"H'), 'dimensions')
+  assert.equal(iconForLine('Size: Large'), 'dimensions')
+  assert.equal(iconForLine('Weight: 4.7kg approx.'), 'weight')
+  assert.equal(iconForLine('Price: Rs.10500/-'), 'price')
+  assert.equal(iconForLine('Price - Rs.10500/-'), 'price')
 })
 
-test('withDetailMarkers leaves an empty details section untouched', () => {
-  assert.equal(withDetailMarkers(''), '')
-})
-
-test('withDetailMarkers never touches continuation lines under a label', () => {
-  const marked = withDetailMarkers('Dimensions:\nC: 12" x 5.5" x 4"\nD: 10" x 4.5" x 4.5"')
-  const lines = marked.split('\n')
-  assert.equal(lines[0], '– Dimensions:')
-  assert.equal(lines[1], 'C: 12" x 5.5" x 4"')
-  assert.equal(lines[2], 'D: 10" x 4.5" x 4.5"')
+test('iconForLine returns null for unmapped labels and continuation lines', () => {
+  assert.equal(iconForLine('Note: something else'), null)
+  assert.equal(iconForLine('Origin: Tamil Nadu'), null) // curated set, not guessed
+  assert.equal(iconForLine('C: 12" x 5.5" x 4"'), null)
+  assert.equal(iconForLine('Just a description line.'), null)
 })

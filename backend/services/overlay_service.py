@@ -43,6 +43,9 @@ class OverlayElement:
     # content needs more room, so text is never clipped.
     box_width: float = 0.0
     box_height: float = 0.0
+    # Prefix recognised Details/Price lines with a small icon, tinted to the
+    # element's own text colour (see utils/icons.py). Off by default.
+    show_icons: bool = False
 
     # image elements
     asset_id: str = ""
@@ -65,6 +68,7 @@ class OverlayElement:
             style=TextStyle.from_payload(data),
             box_width=clamp(as_float(data.get("boxWidth"), 0.0), 0.0, 200.0),
             box_height=clamp(as_float(data.get("boxHeight"), 0.0), 0.0, 400.0),
+            show_icons=bool(data.get("showIcons", False)),
             asset_id=str(data.get("assetId") or "")[:64],
             width_percent=clamp(as_float(data.get("widthPercent"), 20.0), 0.5, 400.0),
         )
@@ -110,7 +114,13 @@ def render_element(frame: Image.Image, element: OverlayElement, assets: dict) ->
             box_width_px = (element.box_width / 100.0) * frame_w
             box_height_px = (element.box_height / 100.0) * frame_h
             tile, _ = render_text_box(
-                element.text, frame_w, element.style, box_width_px, box_height_px, element.opacity
+                element.text,
+                frame_w,
+                element.style,
+                box_width_px,
+                box_height_px,
+                element.opacity,
+                element.show_icons,
             )
         else:
             tile, _ = render_text_block(element.text, frame_w, element.style, element.opacity)

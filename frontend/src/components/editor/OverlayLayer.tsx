@@ -9,12 +9,13 @@
  * The layer itself never swallows pointer events — only the elements do — so
  * dragging the photo underneath still works in the batch editor.
  */
-import { RotateCw } from 'lucide-react'
+import { Banknote, Ruler, RotateCw, Scale, Trees } from 'lucide-react'
 import { useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import { cn } from '@/lib/utils'
 import type { CanvasAsset, OverlayElement } from '@/types/editor'
+import { type CatalogIconName, iconForLine } from '@/utils/catalogParser'
 import {
   BOX_WIDTH_MAX,
   BOX_WIDTH_MIN,
@@ -25,6 +26,58 @@ import {
   elementStyle,
 } from '@/utils/overlays'
 import { clamp, type Size } from '@/utils/transforms'
+
+// Same source icons the backend rasterizes (see backend/assets/icons/) -
+// here as Lucide's own SVG components so the preview can tint them to
+// `currentColor` live, with no image request and no export/preview colour
+// drift possible.
+const CATALOG_ICONS: Record<CatalogIconName, typeof Ruler> = {
+  dimensions: Ruler,
+  weight: Scale,
+  material: Trees,
+  price: Banknote,
+}
+
+/** Renders a box-text element's content line by line so a recognised
+ * Details/Price line ("Material:", "Dimensions:", ...) can show its icon
+ * before the text - mirrors `render_text_box`'s `show_icons` on the server,
+ * with each row free to wrap normally if it's long. */
+function CatalogTextContent({ element }: { element: OverlayElement }) {
+  const lines = element.text.split('\n')
+  const justify =
+    element.align === 'left' ? 'flex-start' : element.align === 'right' ? 'flex-end' : 'center'
+
+  return (
+    <>
+      {lines.map((line, index) => {
+        const iconName = iconForLine(line)
+        const Icon = iconName ? CATALOG_ICONS[iconName] : null
+        if (!Icon) {
+          return (
+            <div key={index} style={{ whiteSpace: 'pre-wrap' }}>
+              {line || ' '}
+            </div>
+          )
+        }
+        return (
+          <div
+            key={index}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: justify, gap: '0.32em' }}
+          >
+            <Icon
+              size="0.85em"
+              color="currentColor"
+              strokeWidth={2}
+              style={{ flexShrink: 0 }}
+              aria-hidden="true"
+            />
+            <span style={{ whiteSpace: 'pre-wrap' }}>{line}</span>
+          </div>
+        )
+      })}
+    </>
+  )
+}
 
 export interface OverlayLayerProps {
   frame: Size
@@ -260,6 +313,8 @@ function ElementView({
         ) : (
           <span className="pointer-events-none block size-full bg-muted/60" />
         )
+      ) : element.boxWidth > 0 && element.showIcons ? (
+        <CatalogTextContent element={element} />
       ) : (
         element.text
       )}

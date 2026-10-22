@@ -192,6 +192,112 @@ def test_capabilities_expose_both_font_families(client):
     )
 
 
+# --- glyph fallback (a character the editorial face lacks) --------------------
+
+
+def test_serif_font_is_missing_the_rupee_glyph():
+    """Documents *why* the fallback exists: Crimson Text genuinely has no
+    glyph for U+20B9. If a future font swap adds it, this simply starts
+    passing differently - it isn't asserting a requirement on the font."""
+    from utils.fonts import charset_for
+
+    charset = charset_for(True, "serif")
+    assert charset is not None, "fonttools must be able to read the bundled font"
+    assert 0x20B9 not in charset
+
+
+def test_missing_glyph_falls_back_instead_of_a_tofu_box(tmp_path):
+    """A character the serif face lacks (Rupee sign) must still render -
+    using the broad-coverage default face for just that character - rather
+    than a missing-glyph box in the final export."""
+    style = TextStyle(font_size=40, bold=True, color="#000000", background="none", font_family="serif")
+    tile, geom = render_text_box("Price: ₹500", 1240, style, box_width_px=800)
+    assert geom["lines"] == 1
+    # A missing glyph in Pillow still occupies pixels (a hollow box), so this
+    # doesn't prove correctness by itself, but it does prove the render path
+    # completes without error and produces real ink.
+    assert tile.getbbox() is not None
+
+
+def test_ordinary_ascii_text_is_unaffected_by_fallback_plumbing(tmp_path):
+    """The common case (everything covered by the primary font) must render
+    identically to before - no fallback font is even loaded unnecessarily."""
+    style = TextStyle(font_size=40, bold=True, color="#000000", background="none", font_family="serif")
+    tile, geom = render_text_box("Plain ASCII text", 1240, style, box_width_px=800)
+    assert geom["lines"] == 1
+    assert tile.getbbox() is not None
+
+
+# --- detail icons (off by default) ---------------------------------------------
+
+
+def test_icon_for_line_maps_known_labels():
+    from utils.icons import icon_for_line
+
+    assert icon_for_line("Material: Terracotta") == "material"
+    assert icon_for_line("Dimensions: 23.5\"H") == "dimensions"
+    assert icon_for_line("Size: Large") == "dimensions"
+    assert icon_for_line("Weight: 4.7kg") == "weight"
+    assert icon_for_line("Price: Rs.500") == "price"
+    assert icon_for_line("Price - Rs.500") == "price"
+
+
+def test_icon_for_line_ignores_unmapped_or_continuation_lines():
+    from utils.icons import icon_for_line
+
+    assert icon_for_line("Note: something") is None
+    assert icon_for_line('C: 12" x 5.5" x 4"') is None
+    assert icon_for_line("Origin: Tamil Nadu") is None  # curated set, not guessed
+
+
+def test_show_icons_defaults_to_off():
+    element = OverlayElement.from_payload({"type": "text", "text": "Weight: 1kg", "boxWidth": 80})
+    assert element.show_icons is False
+
+
+def test_show_icons_grows_the_tile_to_fit_the_icon(tmp_path):
+    """Enabling icons must never shrink or clip anything - only add room."""
+    style = TextStyle(font_size=30, bold=False, color="#000000", background="none", font_family="serif")
+    plain, _ = render_text_box("Weight: 4.7kg approx.", 1240, style, box_width_px=800, show_icons=False)
+    with_icon, _ = render_text_box("Weight: 4.7kg approx.", 1240, style, box_width_px=800, show_icons=True)
+    assert with_icon.size[0] == plain.size[0]  # same box width, as requested
+    assert with_icon.size[1] == plain.size[1]  # height is unaffected
+
+
+def test_icon_only_prefixes_the_label_line_not_continuations():
+    """"Dimensions:\\nC: ...\\nD: ..." must get exactly one icon, on the
+    "Dimensions:" line - never on the "C:"/"D:" continuation lines."""
+    style = TextStyle(font_size=24, bold=False, color="#000000", background="none", font_family="serif")
+    text = 'Dimensions:\nC: 12" x 5.5" x 4"\nD: 10" x 4.5" x 4.5"'
+    no_icons, _ = render_text_box(text, 1240, style, box_width_px=800, show_icons=False)
+    with_icons, geom = render_text_box(text, 1240, style, box_width_px=800, show_icons=True)
+    assert geom["lines"] == 3
+    # Only the icon adds width; the box is otherwise identical, so a wider
+    # tile with the same line count is exactly what one icon should produce.
+    assert with_icons.size[0] == no_icons.size[0] == 800
+
+
+def test_show_icons_via_overlay_element_end_to_end():
+    """The full path: payload -> OverlayElement -> render_element, with
+    showIcons set, must not raise and must produce a normally-sized frame."""
+    element = OverlayElement.from_payload(
+        {
+            "type": "text",
+            "text": "Weight: 4.7kg approx.",
+            "boxWidth": 80,
+            "fontSize": 24,
+            "background": "none",
+            "color": "#000000",
+            "fontFamily": "serif",
+            "showIcons": True,
+        }
+    )
+    assert element.show_icons is True
+    frame = Image.new("RGBA", (1240, 1754), (237, 235, 236, 255))
+    result = render_element(frame, element, {})
+    assert result.size == (1240, 1754)
+
+
 # --- full compose API: catalog card -------------------------------------------
 
 

@@ -50,7 +50,7 @@ export function CatalogSetup({ compose }: { compose: UseCompose }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [preset, setPreset] = useState<'catalog' | 'catalog-large'>('catalog-large')
-  const [detailMarkers, setDetailMarkers] = useState(false)
+  const [showIcons, setShowIcons] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const { serifDisplayName } = useFontSync()
@@ -69,7 +69,7 @@ export function CatalogSetup({ compose }: { compose: UseCompose }) {
 
   const create = () => {
     if (!assetId || !text.trim()) return
-    const result = compose.createCatalogSlide(text, assetId, { preset, detailMarkers })
+    const result = compose.createCatalogSlide(text, assetId, { preset, showIcons })
     if (result?.fontSizeReduced) {
       toast('Font size reduced to fit', {
         description:
@@ -196,15 +196,16 @@ export function CatalogSetup({ compose }: { compose: UseCompose }) {
 
       <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-3 py-2.5">
         <div>
-          <p className="text-[12.5px] font-medium">Detail markers</p>
+          <p className="text-[12.5px] font-medium">Detail icons</p>
           <p className="text-[11px] text-muted-foreground">
-            A subtle dash before each Details line (Dimensions, Weight, …). Off by default.
+            A small icon before each Details/Price line (ruler, scale, wood, banknote). Off by
+            default.
           </p>
         </div>
         <Switch
-          checked={detailMarkers}
-          onCheckedChange={setDetailMarkers}
-          aria-label="Add subtle markers before each detail line"
+          checked={showIcons}
+          onCheckedChange={setShowIcons}
+          aria-label="Add small icons before each detail and price line"
         />
       </div>
 

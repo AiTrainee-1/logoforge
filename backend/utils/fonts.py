@@ -100,6 +100,30 @@ def font_family_name(bold: bool = True, family: str = DEFAULT_FAMILY) -> str:
     return path.stem if path is not None else "default"
 
 
+@functools.lru_cache(maxsize=8)
+def font_charset(path_str: str):
+    """Codepoints this font file has a real glyph for, read from its own
+    cmap table - or None if that couldn't be determined (missing/broken
+    font), in which case callers should assume full coverage rather than
+    degrade. Used so a character a curated editorial face doesn't include
+    (a currency symbol, say) falls back to the broad-coverage default face
+    instead of rendering as a missing-glyph box."""
+    try:
+        from fontTools.ttLib import TTFont
+
+        with TTFont(path_str, fontNumber=0, lazy=True) as tt:
+            cmap = tt.getBestCmap()
+            return frozenset(cmap.keys()) if cmap else None
+    except Exception:  # noqa: BLE001 - any parse failure just disables fallback
+        return None
+
+
+def charset_for(bold: bool = True, family: str = DEFAULT_FAMILY):
+    """`font_charset` for whichever file `font_path(bold, family)` resolves to."""
+    path = font_path(bold, family)
+    return font_charset(str(path)) if path is not None else None
+
+
 def bundled_font_file(family: str = DEFAULT_FAMILY) -> dict:
     """URLs for fonts the deployer put in ``assets/fonts``.
 

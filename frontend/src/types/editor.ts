@@ -224,6 +224,9 @@ export interface OverlayElement {
    * generated sections opt into "serif".
    */
   fontFamily: 'default' | 'serif'
+  /** Off by default. Prefixes each recognised Details/Price line ("Material:",
+   * "Dimensions:", "Weight:", "Price:") with a small icon tinted to `color`. */
+  showIcons: boolean
 
   // image elements
   assetId: string
@@ -249,6 +252,7 @@ export const DEFAULT_ELEMENT: Omit<OverlayElement, 'id'> = {
   boxWidth: 0,
   boxHeight: 0,
   fontFamily: 'default',
+  showIcons: false,
   assetId: '',
   widthPercent: 20,
 }

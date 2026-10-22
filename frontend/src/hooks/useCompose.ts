@@ -70,7 +70,7 @@ export interface UseCompose {
     options?: {
       preset?: 'catalog' | 'catalog-large'
       margins?: CatalogMargins
-      detailMarkers?: boolean
+      showIcons?: boolean
     },
   ) => { fontSizeReduced: boolean } | null
   select: (id: string | null) => void
@@ -266,7 +266,7 @@ export function useCompose(onError: (message: string) => void): UseCompose {
     (
       text: string,
       assetId: string,
-      options?: { preset?: 'catalog' | 'catalog-large'; margins?: CatalogMargins; detailMarkers?: boolean },
+      options?: { preset?: 'catalog' | 'catalog-large'; margins?: CatalogMargins; showIcons?: boolean },
     ) => {
       const asset = assets.find((item) => item.id === assetId)
       const presetKey = options?.preset ?? 'catalog-large'
@@ -276,7 +276,7 @@ export function useCompose(onError: (message: string) => void): UseCompose {
         text,
         asset,
         margins: options?.margins,
-        detailMarkers: options?.detailMarkers,
+        showIcons: options?.showIcons,
       })
 
       // One element per recognised section (title/description/details/price)

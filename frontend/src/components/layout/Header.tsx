@@ -30,11 +30,10 @@ const SHORTCUTS: [string, string][] = [
 export function Logomark() {
   return (
     <span className="flex items-center gap-2">
-      <span className="relative grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-        <span className="text-[15px] leading-none font-bold">L</span>
-        <span className="absolute -top-1 -right-1 size-3 rounded-[4px] bg-foreground/80" />
+      <span className="relative grid size-8 place-items-center rounded-full bg-accent-foreground text-background shadow-sm">
+        <span className="font-brand text-[15px] leading-none font-semibold">L</span>
       </span>
-      <span className="text-[15px] font-semibold tracking-tight">LogoForge</span>
+      <span className="font-brand text-[17px] tracking-wide">LogoForge</span>
     </span>
   )
 }
@@ -58,7 +57,7 @@ export function Header({
       type="button"
       onClick={() => onNavigate(value)}
       className={cn(
-        'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors',
+        'text-tracked flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
         page === value
           ? 'bg-card text-foreground shadow-xs'
           : 'text-muted-foreground hover:text-foreground',

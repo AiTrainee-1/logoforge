@@ -278,6 +278,7 @@ export function toPayload(element: OverlayElement) {
     boxWidth: element.boxWidth,
     boxHeight: element.boxHeight,
     fontFamily: element.fontFamily,
+    showIcons: element.showIcons,
   }
 }
 

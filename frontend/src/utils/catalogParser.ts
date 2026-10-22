@@ -107,17 +107,28 @@ export function parseCatalogText(raw: string): CatalogSections {
 }
 
 /**
- * Optional, off by default: prefix each recognised detail-field's label line
- * with a subtle marker. Plain text through the same renderer every other
- * line already goes through - not an icon asset, not an emoji, and never
- * applied to title/description/price. Only lines that already matched
- * `LABEL_PATTERN` are touched; continuation lines (e.g. the "C:"/"D:" rows
- * under "Dimensions:") are left exactly as the user wrote them.
+ * Small icon name for a recognised Details/Price line, or null. Mirrors
+ * `backend/utils/icons.py::icon_for_line` exactly - same curated whitelist
+ * (an unmapped label like "Origin:" gets no icon, never a mismatched
+ * generic one), same "Price:"/"Price -"/"Price —" detection. Used to show
+ * the same icon in the live preview that the export will actually draw.
  */
-export function withDetailMarkers(details: string, marker = '–'): string {
-  if (!details) return details
-  return details
-    .split('\n')
-    .map((line) => (LABEL_PATTERN.test(line) ? `${marker} ${line}` : line))
-    .join('\n')
+export type CatalogIconName = 'dimensions' | 'weight' | 'material' | 'price'
+
+const ICON_FOR_LABEL: Record<string, CatalogIconName> = {
+  dimensions: 'dimensions',
+  dimension: 'dimensions',
+  size: 'dimensions',
+  weight: 'weight',
+  material: 'material',
+  materials: 'material',
+  medium: 'material',
+}
+
+export function iconForLine(line: string): CatalogIconName | null {
+  if (PRICE_PATTERN.test(line)) return 'price'
+  const match = LABEL_PATTERN.exec(line)
+  if (!match) return null
+  const word = line.trim().split(':', 1)[0].trim().toLowerCase()
+  return ICON_FOR_LABEL[word] ?? null
 }
