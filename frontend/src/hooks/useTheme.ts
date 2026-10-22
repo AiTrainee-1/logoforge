@@ -9,7 +9,9 @@ function initialTheme(): Theme {
   if (typeof window === 'undefined') return 'light'
   const stored = window.localStorage.getItem(STORAGE_KEY)
   if (stored === 'light' || stored === 'dark') return stored
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  // Always start on the off-white light theme - the brand identity - rather
+  // than following the OS's dark-mode preference. Visitors can still switch.
+  return 'light'
 }
 
 export function useTheme() {

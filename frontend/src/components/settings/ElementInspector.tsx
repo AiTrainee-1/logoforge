@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import { useFontSync } from '@/hooks/useFontSync'
 import { cn } from '@/lib/utils'
 import type { LabelBackground, OverlayElement, TextAlign } from '@/types/editor'
 import {
@@ -77,6 +78,7 @@ export function ElementInspector({
 }) {
   const isText = element.type === 'text'
   const isBox = isText && element.boxWidth > 0
+  const { displayName, serifDisplayName } = useFontSync()
 
   return (
     <div className="space-y-4">
@@ -132,6 +134,23 @@ export function ElementInspector({
             />
           </FieldRow>
         </div>
+      ) : null}
+
+      {isText ? (
+        <FieldRow label="Font" hint="The serif face is the Catalog Composer's own typeface.">
+          <Select
+            value={element.fontFamily}
+            onValueChange={(value) => onChange({ fontFamily: value as OverlayElement['fontFamily'] })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Sans{displayName ? ` (${displayName})` : ''}</SelectItem>
+              <SelectItem value="serif">Serif{serifDisplayName ? ` (${serifDisplayName})` : ''}</SelectItem>
+            </SelectContent>
+          </Select>
+        </FieldRow>
       ) : null}
 
       {isText ? (

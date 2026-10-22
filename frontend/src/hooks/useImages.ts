@@ -12,6 +12,7 @@ import { DEFAULT_TRANSFORM } from '@/types/editor'
 import { normaliseTransform } from '@/utils/transforms'
 import { clampElement, createElement, ELEMENT_LIMIT } from '@/utils/overlays'
 import { createThumbnail } from '@/utils/thumbnails'
+import { clearSavedLogo, loadSavedLogo, saveLogoBlob } from '@/utils/logoStorage'
 
 /** What undo/redo restores for one image: its transform *and* its elements. */
 interface ImageState {
@@ -62,7 +63,7 @@ export interface UseImages {
   clearOverlays: (imageId: string) => void
   copyOverlaysToAll: (imageId: string) => void
 
-  setLogoFile: (file: File) => Promise<void>
+  setLogoFile: (file: File, options?: { remember?: boolean }) => Promise<void>
   clearLogo: () => Promise<void>
 
   undo: () => void
@@ -455,7 +456,7 @@ export function useImages(onError: (message: string) => void): UseImages {
   )
 
   const setLogoFile = useCallback(
-    async (file: File) => {
+    async (file: File, options?: { remember?: boolean }) => {
       try {
         let activeJob = jobId
         if (!activeJob) {
@@ -467,6 +468,7 @@ export function useImages(onError: (message: string) => void): UseImages {
             objectUrls.current.add(previewUrl)
             setLogo({ ...created.logo, previewUrl })
           }
+          if (options?.remember !== false) void saveLogoBlob(file)
           return
         }
         const response = await api.uploadLogo(activeJob, file)
@@ -477,12 +479,26 @@ export function useImages(onError: (message: string) => void): UseImages {
         const previewUrl = URL.createObjectURL(file)
         objectUrls.current.add(previewUrl)
         setLogo({ ...response.logo, previewUrl })
+        if (options?.remember !== false) void saveLogoBlob(file)
       } catch (cause) {
         fail(cause, 'The logo could not be uploaded.')
       }
     },
     [fail, jobId, logo],
   )
+
+  // Restore a previously uploaded logo (saved locally in IndexedDB) once,
+  // on first mount, so the user never has to re-upload it every visit.
+  const setLogoFileRef = useRef(setLogoFile)
+  setLogoFileRef.current = setLogoFile
+  const restoredLogo = useRef(false)
+  useEffect(() => {
+    if (restoredLogo.current) return
+    restoredLogo.current = true
+    void loadSavedLogo().then((file) => {
+      if (file) void setLogoFileRef.current(file, { remember: false })
+    })
+  }, [])
 
   const clearLogo = useCallback(async () => {
     if (jobId) {
@@ -498,6 +514,7 @@ export function useImages(onError: (message: string) => void): UseImages {
       objectUrls.current.delete(logo.previewUrl)
     }
     setLogo(null)
+    void clearSavedLogo()
   }, [fail, jobId, logo])
 
   const selected = useMemo(() => images[safeIndex] ?? null, [images, safeIndex])
