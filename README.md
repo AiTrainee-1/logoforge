@@ -108,8 +108,18 @@ touches image B; "Apply to all" is an explicit button.
 Render order is fixed so the branding never drifts with the photo:
 
 ```
-frame → image (scale + offset, cropped to frame) → logo → character label → encode
+frame → background → image (scale + offset, cropped to frame) → logo → character label → encode
 ```
+
+**Background.** Wherever the photo doesn't cover the frame (`contain`, or
+scaled down) the background shows: a fixed colour, or **Match background**,
+which fills it with the colour along each photo's own edges so a grey studio
+sweep carries on to the frame's edges instead of sitting between white bands.
+The edge colours are measured once at upload (`images[].edge` in the upload
+response) and the renderer reuses those stored numbers, so the preview and the
+file agree exactly. The fill can also blend from the top edge colour to the
+bottom one, and the photo's open edges can be faded into it. Ported pair:
+`backend/services/background_service.py` ↔ `frontend/src/utils/background.ts`.
 
 ---
 
@@ -152,6 +162,15 @@ A processing request body:
 
 Labels are **not** sent by the client: the server derives `A`, `B`, `C` … from
 `order`, so reordering always renumbers correctly.
+
+Background options live in `export`:
+
+| Field             | Values                                   | Default     |
+| ----------------- | ---------------------------------------- | ----------- |
+| `background`      | fixed fill colour, `#RRGGBB`             | `#FFFFFF`   |
+| `backgroundMode`  | `color` (use `background`) or `match`    | `color`     |
+| `backgroundStyle` | `solid` or `vertical` (top → bottom edge) | `solid`     |
+| `seamSoften`      | 0–60, fade width in px at 1080 wide      | `0`         |
 
 ---
 

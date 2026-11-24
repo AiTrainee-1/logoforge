@@ -8,12 +8,17 @@
  */
 import { Hand, ImageOff } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
+import type {
+  CSSProperties,
+  PointerEvent as ReactPointerEvent,
+  WheelEvent as ReactWheelEvent,
+} from 'react'
 
 import { LabelOverlay, LogoOverlay } from '@/components/editor/CanvasOverlays'
 import { OverlayLayer } from '@/components/editor/OverlayLayer'
 import { useStudio } from '@/hooks/useStudio'
 import { cn } from '@/lib/utils'
+import { frameFill, matchedEdges, seamMaskImage } from '@/utils/background'
 import { alphabeticLabel } from '@/utils/labels'
 import { computeFrame, computePlacement, SCALE_MAX, SCALE_MIN, clamp } from '@/utils/transforms'
 
@@ -176,7 +181,31 @@ export function EditorCanvas({ className }: { className?: string }) {
     scheduleCommit()
   }
 
-  const showCheckerboard = selected.hasAlpha && exportSettings.keepTransparency
+  // The background is decided in export pixels, exactly as the server decides
+  // it, then drawn at preview size.
+  const exportPlacement = computePlacement(source, frame, selected.transform, exportSettings.fit)
+  const matched = matchedEdges(exportSettings, selected.edge)
+  // A matched backdrop fills the frame even where transparency is kept. The
+  // before view shows the untouched upload, so it keeps the checkerboard.
+  const showCheckerboard =
+    selected.hasAlpha && exportSettings.keepTransparency && (showBefore || !matched)
+  const fill = showBefore
+    ? { backgroundColor: exportSettings.background }
+    : frameFill(exportSettings, selected.edge, exportPlacement, frame)
+  const seamMask = seamMaskImage(
+    exportSettings.seamSoften,
+    exportPlacement,
+    frame,
+    previewWidth / frame.width,
+  )
+  const seamStyle: CSSProperties = seamMask
+    ? {
+        maskImage: seamMask,
+        WebkitMaskImage: seamMask,
+        maskComposite: 'intersect',
+        WebkitMaskComposite: 'source-in',
+      }
+    : {}
 
   return (
     <div
@@ -199,7 +228,7 @@ export function EditorCanvas({ className }: { className?: string }) {
           width: previewWidth,
           height: previewHeight,
           touchAction: 'none',
-          backgroundColor: showCheckerboard ? undefined : exportSettings.background,
+          ...(showCheckerboard ? {} : fill),
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -228,6 +257,7 @@ export function EditorCanvas({ className }: { className?: string }) {
                 top: placement.y,
                 width: placement.width,
                 height: placement.height,
+                ...seamStyle,
               }}
             />
             {images.logo ? (

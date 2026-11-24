@@ -8,7 +8,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { Separator } from '@/components/ui/primitives'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { BackgroundPanel } from '@/components/settings/BackgroundPanel'
 import { CharacterPanel } from '@/components/settings/CharacterPanel'
 import { ExportPanel } from '@/components/settings/ExportPanel'
 import { ImageTransformPanel } from '@/components/settings/ImageTransformPanel'
@@ -28,8 +30,10 @@ export function SettingsSidebar({ className }: { className?: string }) {
           <TabsTrigger value="export">Export</TabsTrigger>
         </TabsList>
         <div className="scrollbar-thin -mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
-          <TabsContent value="image">
+          <TabsContent value="image" className="space-y-6">
             <ImageTransformPanel />
+            <Separator />
+            <BackgroundPanel />
           </TabsContent>
           <TabsContent value="logo">
             <LogoPanel />
@@ -60,6 +64,12 @@ export function SettingsAccordion({ className }: { className?: string }) {
         <AccordionTrigger>Image Transform</AccordionTrigger>
         <AccordionContent>
           <ImageTransformPanel />
+        </AccordionContent>
+      </AccordionItem>
+      <AccordionItem value="background">
+        <AccordionTrigger>Background</AccordionTrigger>
+        <AccordionContent>
+          <BackgroundPanel />
         </AccordionContent>
       </AccordionItem>
       <AccordionItem value="logo">

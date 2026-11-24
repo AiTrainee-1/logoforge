@@ -5,6 +5,7 @@
  */
 import type {
   ComposeResult,
+  EdgeColors,
   ImageTransform,
   JobStatus,
   ProcessedResult,
@@ -35,6 +36,8 @@ export interface ServerImage {
   mime: string
   hasAlpha: boolean
   animated: boolean
+  /** Measured at upload; null if the server couldn't measure it. */
+  edge?: EdgeColors | null
 }
 
 export interface ServerLogo {

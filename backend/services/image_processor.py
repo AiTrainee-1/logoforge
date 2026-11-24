@@ -23,8 +23,17 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageChops, ImageOps
 
+from services.background_service import (
+    analyse_edges,
+    background_fill,
+    matched_edges,
+    open_edges,
+    paint_background,
+    seam_mask,
+    seam_width,
+)
 from services.label_service import LabelSettings, composite_label, parse_hex
 from services.logo_processor import LogoSettings, composite_logo, paste_rgba
 from services.overlay_service import render_elements
@@ -181,6 +190,21 @@ def draw_source(canvas: Image.Image, source: Image.Image, placement) -> Image.Im
     return paste_rgba(canvas, region, paste_x, paste_y)
 
 
+def draw_source_softened(
+    canvas: Image.Image, source: Image.Image, placement, mask: Image.Image
+) -> Image.Image:
+    """``draw_source``, with the photo's alpha multiplied by a seam ``mask``."""
+    layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    layer = draw_source(layer, source, placement)
+    alpha = layer.getchannel("A")
+    faded = ImageChops.multiply(alpha, mask)
+    layer.putalpha(faded)
+    canvas.alpha_composite(layer)
+    for image in (layer, alpha, faded):
+        image.close()
+    return canvas
+
+
 def encode(image: Image.Image, image_format: str, export: ExportSettings, info: dict) -> bytes:
     """Encode once, at the highest practical quality for the container."""
     buffer = io.BytesIO()
@@ -316,15 +340,42 @@ def render(source_path: Path, spec: RenderSpec, source_meta: dict) -> RenderResu
             and spec.export.keep_transparency
             and (source.mode in ("RGBA", "LA", "PA") or "transparency" in source.info)
         )
-        background = (
-            (0, 0, 0, 0)
-            if wants_alpha
-            else parse_hex(spec.export.background, (255, 255, 255)) + (255,)
-        )
-        canvas = Image.new("RGBA", (frame_w, frame_h), background)
+
+        edges = None
+        if spec.export.background_mode == "match":
+            # Measured at upload and stored with the record, so this render
+            # uses exactly the colours the preview showed.
+            edges = (
+                source_meta["edge"] if "edge" in source_meta else analyse_edges(source_path)
+            )
+        matched = matched_edges(spec.export, edges)
+        if spec.export.background_mode == "match" and matched is None and any(
+            open_edges(placement, frame_w, frame_h)
+        ):
+            notes.append(
+                "Its edges are transparent, so there was no colour to match."
+                if edges and edges.get("transparent")
+                else "Its edge colour couldn't be measured, so the fixed background colour was used."
+            )
+
+        if wants_alpha and matched is None:
+            canvas = Image.new("RGBA", (frame_w, frame_h), (0, 0, 0, 0))
+        else:
+            # A matched background fills the frame even when the photo has an
+            # alpha channel: the user asked for the backdrop to continue.
+            canvas = paint_background(
+                (frame_w, frame_h), background_fill(spec.export, edges), placement
+            )
 
         rgba_source = source if source.mode == "RGBA" else source.convert("RGBA")
-        canvas = draw_source(canvas, rgba_source, placement)
+        mask = seam_mask(
+            (frame_w, frame_h), placement, seam_width(spec.export, placement, frame_w)
+        )
+        if mask is None:
+            canvas = draw_source(canvas, rgba_source, placement)
+        else:
+            canvas = draw_source_softened(canvas, rgba_source, placement, mask)
+            mask.close()
         if rgba_source is not source:
             rgba_source.close()
     finally:

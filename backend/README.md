@@ -21,6 +21,7 @@ backend/
 ├── services/
 │   ├── transform_service.py   the shared placement maths (ported to TS)
 │   ├── image_processor.py     decode -> place -> composite -> encode
+│   ├── background_service.py  frame background: edge matching, blend, seam fade (ported to TS)
 │   ├── logo_processor.py      logo geometry and compositing
 │   ├── label_service.py       the A/B/C character label
 │   ├── zip_service.py         validation + ZIP_STORED packaging

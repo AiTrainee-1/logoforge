@@ -162,6 +162,7 @@ export function useImages(onError: (message: string) => void): UseImages {
             format: record.format,
             mime: record.mime,
             hasAlpha: record.hasAlpha,
+            edge: record.edge ?? null,
             previewUrl,
             thumbUrl: file ? await createThumbnail(file) : '',
             transform: { ...DEFAULT_TRANSFORM },

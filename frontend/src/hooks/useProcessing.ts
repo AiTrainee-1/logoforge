@@ -121,6 +121,9 @@ export function useProcessing(onError: (message: string) => void): UseProcessing
           quality: exportSettings.quality,
           background: exportSettings.background,
           keepTransparency: exportSettings.keepTransparency,
+          backgroundMode: exportSettings.backgroundMode,
+          backgroundStyle: exportSettings.backgroundStyle,
+          seamSoften: exportSettings.seamSoften,
         },
       }
 

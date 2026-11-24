@@ -38,6 +38,12 @@ EXPORT_PRESETS = {
     "925x1131": (925, 1131),
 }
 
+# Background behind a photo that doesn't cover its frame.
+BACKGROUND_MODES = ("color", "match")   # fixed colour | each photo's edge colour
+BACKGROUND_STYLES = ("solid", "vertical")  # one colour | top-to-bottom blend
+# Widest seam fade, in pixels at the reference width.
+SEAM_SOFTEN_MAX = 60.0
+
 
 @dataclass
 class Transform:
@@ -87,6 +93,12 @@ class ExportSettings:
     background: str = "#FFFFFF"
     keep_transparency: bool = True
     output_format: str = "auto"  # auto | jpeg | png | webp
+    # "match" fills the frame with each photo's own edge colour instead of
+    # ``background``; see services/background_service.py.
+    background_mode: str = "color"
+    background_style: str = "solid"
+    # Fade width for photo edges that meet the background, reference px.
+    seam_soften: float = 0.0
     extra: dict = field(default_factory=dict)
 
     @classmethod
@@ -101,6 +113,12 @@ class ExportSettings:
         out_fmt = str(data.get("outputFormat") or "auto").lower()
         if out_fmt not in ("auto", "jpeg", "png", "webp"):
             out_fmt = "auto"
+        bg_mode = str(data.get("backgroundMode") or "color").lower()
+        if bg_mode not in BACKGROUND_MODES:
+            bg_mode = "color"
+        bg_style = str(data.get("backgroundStyle") or "solid").lower()
+        if bg_style not in BACKGROUND_STYLES:
+            bg_style = "solid"
         return cls(
             format=fmt,
             fit=fit,
@@ -110,6 +128,9 @@ class ExportSettings:
             background=str(data.get("background") or "#FFFFFF"),
             keep_transparency=bool(data.get("keepTransparency", True)),
             output_format=out_fmt,
+            background_mode=bg_mode,
+            background_style=bg_style,
+            seam_soften=clamp(as_float(data.get("seamSoften"), 0.0), 0.0, SEAM_SOFTEN_MAX),
         )
 
 

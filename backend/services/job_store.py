@@ -28,6 +28,7 @@ from pathlib import Path
 from PIL import Image
 
 from config import config
+from services.background_service import analyse_edges
 from services.image_processor import RenderSpec, render
 from services.label_service import LabelSettings
 from services.logo_processor import LogoSettings
@@ -182,7 +183,8 @@ def add_images(job_id: str, files) -> list:
 
         image_id = uuid.uuid4().hex
         stored_name = image_id + (split_ext(original_name)[1] or ".bin")
-        (base / "source" / stored_name).write_bytes(data)
+        stored_path = base / "source" / stored_name
+        stored_path.write_bytes(data)
 
         record = {
             "id": image_id,
@@ -196,6 +198,9 @@ def add_images(job_id: str, files) -> list:
             "mode": info["mode"],
             "hasAlpha": info["hasAlpha"],
             "animated": info["animated"],
+            # The colour along the photo's edges, for "Match background". The
+            # browser previews with it and the renderer reuses it unchanged.
+            "edge": analyse_edges(stored_path),
         }
         existing.append(record)
         added.append(record)

@@ -22,6 +22,31 @@ export type ExportFormat =
 
 export type FitMode = 'cover' | 'contain'
 
+/** "match" fills the frame with each photo's own edge colour. */
+export type BackgroundMode = 'color' | 'match'
+
+/** One matched colour, or a blend from the top edge colour to the bottom one. */
+export type BackgroundStyle = 'solid' | 'vertical'
+
+/**
+ * The colour along a photo's edges, measured once by the server at upload
+ * (`backend/services/background_service.py`). The preview fills with these
+ * values and the export reuses the very same stored numbers.
+ */
+export type EdgeColors =
+  | { transparent: true }
+  | {
+      transparent: false
+      /** Median colour of a thin strip around the whole photo. */
+      color: string
+      top: string
+      bottom: string
+      left: string
+      right: string
+      /** Share of edge pixels (0-1) within a few levels of `color`. */
+      agreement: number
+    }
+
 export type LabelBackground = 'none' | 'shadow' | 'pill'
 
 export interface ImageTransform {
@@ -51,6 +76,8 @@ export interface UploadedImage {
   format: string
   mime: string
   hasAlpha: boolean
+  /** Edge colours for "Match background"; null when they couldn't be measured. */
+  edge: EdgeColors | null
   /** Object URL of the original file - preview only, never the export source. */
   previewUrl: string
   /** Small data URL used by the thumbnail grid. */
@@ -104,8 +131,14 @@ export interface ExportSettings {
   format: ExportFormat
   fit: FitMode
   quality: number
+  /** Fixed colour behind the photo wherever it doesn't cover the frame. */
   background: string
   keepTransparency: boolean
+  /** "match" uses each photo's own edge colour instead of `background`. */
+  backgroundMode: BackgroundMode
+  backgroundStyle: BackgroundStyle
+  /** Fade width for photo edges that meet the background, px at 1080 wide. */
+  seamSoften: number
 }
 
 export interface EditorView {
@@ -170,6 +203,9 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   quality: 100,
   background: '#FFFFFF',
   keepTransparency: true,
+  backgroundMode: 'color',
+  backgroundStyle: 'solid',
+  seamSoften: 0,
 }
 
 /* --------------------------------------------------------------------------
